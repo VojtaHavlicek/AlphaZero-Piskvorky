@@ -30,7 +30,13 @@ class MCTS:
         self.c_puct = c_puct
         self.num_simulations = num_simulations
 
-    def run(self, game): 
+    def run(self, game, temperature) -> tuple: 
+        """ Run MCTS on the given game state.
+        Args:
+            game (Gomoku): The game state to run MCTS on.
+        Returns:
+            tuple: A tuple containing the policy and the best action.
+        """
         root = Node(game)
 
         for _ in range(self.num_simulations):
@@ -49,7 +55,7 @@ class MCTS:
 
             self.backpropagate(path, value if node.game.current_player == -1 else -value)
 
-        return self.get_policy(root)
+        return self.get_policy(root, temperature)
     
     def evaluate(self, game):
         """Evaluate the game state using the neural network."""
