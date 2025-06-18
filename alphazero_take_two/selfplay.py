@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.utils.data import DataLoader, Dataset
 
 from mcts import MCTS
 from games import Gomoku
@@ -10,6 +11,9 @@ from net import AlphaZeroNet
 from datetime import datetime
 from collections import deque
 import random
+
+import shutil, json
+from pathlib import Path
 
 class ReplayBuffer:
     def __init__(self, max_size=10000):
@@ -25,42 +29,21 @@ class ReplayBuffer:
 
     def all(self):
         return list(self.buffer)
-
-
-def play_self_play_game(mcts:MCTS, board_size=8):
-    game = Gomoku(size=board_size)
-    history = [] 
-    move_num = 0 # Annealing TODO: optimal schedule? 
-
-    # Play a self-play game using MCTS
-    while not game.is_terminal():
-        temp = 1.0 if move_num < 10 else 0.01  # Annealing temperature
-        policy, action = mcts.run(game, temperature=temp)
-        state = game.encode().squeeze(0) 
-        history.append((state, policy, game.current_player))
-        game = game.apply_action(action)
-
-    # Game is over 
-    winner = game.get_winner()
-
-    # Convert history to a format suitable for training
-    # NOTE: see that only terminal states are rewarded!
-    data = []
-    for state, policy, player in history:
-        if winner == player:
-            value = 1.0
-        elif winner == 0:
-            value = 0.0
-        else:
-            value = -1.0
-        
-        data.append((state, policy, value))
     
-    return data # List of tuples (state, policy, value) 
-
+    def __len__(self):
+        return len(self.buffer) 
 
 
 from torch.utils.data import Dataset 
+
+def get_best_device():
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    elif torch.cuda.is_available():
+        return torch.device("cuda")
+    else:
+        return torch.device("cpu")
+
 
 class AlphaZeroDataset(Dataset):
     def __init__(self, examples):
@@ -74,79 +57,186 @@ class AlphaZeroDataset(Dataset):
         return state, policy, torch.tensor([value], dtype=torch.float32)
     
 
+class AlphaZeroTrainer:
+    def __init__(self, net, mcts_class, game_class, promoter: 'ModelPromoter', buffer_size=10000):
+        self.device = get_best_device()
+        self.net = net.to(self.device)
+        self.promoter = promoter
+        self.mcts_class = mcts_class
+        self.game_class = game_class
+        self.buffer = ReplayBuffer(max_size=buffer_size)
 
-def train_network(net, examples, epochs=5, batch_size=32, lr=1e-3):
-    dataset = AlphaZeroDataset(examples)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    def play_self_play_game(self, temperature_threshold=10):
+        game = self.game_class()
+        mcts = self.mcts_class(self.net)
+        history = []
+        move_num = 0
 
-    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
-    loss_fn_policy = nn.CrossEntropyLoss()
-    loss_fn_value = nn.MSELoss()
-
-    net.train()
-    for epoch in range(epochs):
-        total_loss = 0
-        for state, policy, value in dataloader:
-            state = state.to(torch.float32)
-            policy = policy.to(torch.float32)
-            value = value.to(torch.float32)
-
-            state = state.to(net.device) if hasattr(net, 'device') else state
-            policy = policy.to(state.device)
-            value = value.to(state.device)
-
-            pred_policy, pred_value = net(state)
-
-            loss_policy = -torch.sum(policy * F.log_softmax(pred_policy, dim=1)) / policy.size(0)
-            loss_value = loss_fn_value(pred_value.view(-1, 1), value)
-            loss = loss_policy + loss_value
-
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            total_loss += loss.item()
-
-        print(f"Epoch {epoch+1}: loss={total_loss/len(dataloader):.4f}")
-
-
-def evaluate_models(new_net, old_net, num_games=20):
-    wins = 0
-    for i in range(num_games):
-        player1 = MCTS(new_net, num_simulations=50)
-        player2 = MCTS(old_net, num_simulations=50)
-
-        game = Gomoku()
-        current = player1 if i % 2 == 0 else player2
         while not game.is_terminal():
-            _, action = current.run(game)
+            temperature = 1.0 if move_num < temperature_threshold else 0.01
+            policy, action = mcts.run(game, temperature=temperature)
+            state = game.encode().squeeze(0)
+            history.append((state, policy, game.current_player))
             game = game.apply_action(action)
-            current = player2 if current == player1 else player1
+            move_num += 1
 
         winner = game.get_winner()
-        if (i % 2 == 0 and winner == 1) or (i % 2 == 1 and winner == -1):
-            wins += 1
+        data = [(s, p, 1 if winner == cp else -1 if winner == -cp else 0)
+                for (s, p, cp) in history]
+        return data
 
-    return wins / num_games
+    def train_step(self, batch_size=64, epochs=10, lr=1e-3):
+        #if len(self.buffer) < batch_size:
+        #    print("Not enough examples to train.")
+        #    return
+
+        dataset = AlphaZeroDataset(self.buffer.sample(batch_size))
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        optimizer = torch.optim.Adam(self.net.parameters(), lr=lr)
+        loss_fn_value = torch.nn.MSELoss()
+
+        self.net.train()
+        for epoch in range(epochs):
+            total_loss = 0
+            for state, policy, value in dataloader:
+                state = state.to(self.device)
+                policy = policy.to(self.device)
+                value = value.to(self.device)
+                pred_policy, pred_value = self.net(state)
+                loss_policy = -torch.sum(policy * torch.nn.functional.log_softmax(pred_policy, dim=1)) / policy.size(0)
+                loss_value = loss_fn_value(pred_value.view(-1, 1), value)
+                loss = loss_policy + loss_value
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                total_loss += loss.item()
+            print(f"Epoch {epoch+1}: loss = {total_loss / len(dataloader):.4f}")
+
+    def evaluate_and_promote(self, candidate_net, eval_fn, metadata=None):
+        best_net = self.net.__class__().to(self.device)  # Create a new instance of the net
+        best_net.load_state_dict(torch.load(self.promoter.best_path))
+        candidate_net = candidate_net.to(self.device)
+        winrate = eval_fn(candidate_net, best_net)
+        self.promoter.promote_if_better(winrate, candidate_net, metadata)
+
+    def train_loop(self, episodes=10, eval_fn=None):
+        for episode in range(episodes):
+            print(f"\n🚀 Self-play game {episode+1}")
+            game_data = self.play_self_play_game()
+            self.buffer.add(game_data)
+            self.train_step()
+
+            if eval_fn is not None:
+                print("\n⚔️  Evaluating candidate model...")
+                self.evaluate_and_promote(self.net, eval_fn, metadata={
+                    "episode": episode + 1,
+                    "buffer_size": len(self.buffer)
+                })
+
+
+
+class ModelPromoter:
+    def __init__(self, model_dir="models", threshold=0.55):
+        self.model_dir = Path(model_dir)
+        self.threshold = threshold
+
+        self.best_path = self.model_dir / "best.pt"
+        self.snapshots_path = self.model_dir / "snapshots"
+        self.logs_path = self.model_dir / "logs"
+
+        self.snapshots_path.mkdir(parents=True, exist_ok=True)
+        self.logs_path.mkdir(parents=True, exist_ok=True)
+
+    def promote_if_better(self, winrate, model: torch.nn.Module, metadata: dict = None):
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        if winrate > self.threshold:
+            print(f"\n✅ Promoting candidate model (win rate = {winrate:.2f})")
+            snapshot_path = self.snapshots_path / f"model_{timestamp}.pt"
+            torch.save(model.state_dict(), snapshot_path)
+            shutil.copy(snapshot_path, self.best_path)
+            status = "promoted"
+        else:
+            print(f"\n❌ Candidate model rejected (win rate = {winrate:.2f})")
+            status = "rejected"
+
+        log = {
+            "timestamp": timestamp,
+            "winrate": winrate,
+            "status": status,
+            **(metadata or {})
+        }
+        log_path = self.logs_path / f"model_{timestamp}.json"
+        with open(log_path, "w") as f:
+            json.dump(log, f, indent=2)
+
+        return log
+
+
+def evaluate_models(candidate_net, best_net, game_class, mcts_class, num_games=20, num_simulations=200, verbose=False):
+    candidate_wins = 0
+    best_wins = 0
+    draws = 0
+
+    for game_idx in range(num_games):
+        game = game_class()
+
+        # Alternate who is first player
+        if game_idx % 2 == 0:
+            players = {1: mcts_class(candidate_net, num_simulations=num_simulations),
+                       -1: mcts_class(best_net, num_simulations=num_simulations)}
+            first = "Candidate"
+        else:
+            players = {1: mcts_class(best_net, num_simulations=num_simulations),
+                       -1: mcts_class(candidate_net, num_simulations=num_simulations)}
+            first = "Best"
+
+        if verbose:
+            print(f"\nGame {game_idx+1}: {first} goes first")
+
+        while not game.is_terminal():
+            mcts = players[game.current_player]
+            _, action = mcts.run(game, temperature=0.0)  # deterministic best move
+            game = game.apply_action(action)
+
+        winner = game.get_winner()
+        if winner == 1:
+            if first == "Candidate":
+                candidate_wins += 1
+            else:
+                best_wins += 1
+        elif winner == -1:
+            if first == "Candidate":
+                best_wins += 1
+            else:
+                candidate_wins += 1
+        else:
+            draws += 1
+
+    total = candidate_wins + best_wins + draws
+    win_rate = candidate_wins / total if total > 0 else 0.0
+    print(f"\n🏁 Evaluation Result: Candidate Win Rate = {win_rate:.2f} ({candidate_wins}W / {best_wins}L / {draws}D)")
+    return win_rate
 
 
 if __name__ == "__main__":
     net = AlphaZeroNet(board_size=8)
-    mcts = MCTS(net, num_simulations=50)
+    mcts = MCTS(net, num_simulations=1000)
+    promoter = ModelPromoter(model_dir="models", threshold=0.55)
+    trainer = AlphaZeroTrainer(net, mcts_class=MCTS, game_class=Gomoku, promoter=promoter, buffer_size=10000)
 
-    buffer = ReplayBuffer(max_size=10000)
-
-    for episode in range(10):  # try 10 games to start
-        print(f"Self-play game {episode+1}")
-        game_data = play_self_play_game(mcts, board_size=8)
-        buffer.add(game_data)
-        train_network(net, buffer.sample(batch_size=256), epochs=5)
-        print("---------------------------")
-
-    print("Training complete. Saving model...")
+    # Example training loop
+    trainer.train_loop(episodes=10, 
+                       eval_fn=lambda cnet, bnet: evaluate_models(
+        candidate_net=cnet,
+        best_net=bnet,
+        game_class=Gomoku,
+        mcts_class=MCTS,
+        num_games=20,
+        num_simulations=1000
+    ))  # Replace eval_fn with your evaluation function
+    
 
     
 
-    # Save the model with a timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    torch.save(net.state_dict(), f"models/gomoku_{timestamp}.pt")
 
