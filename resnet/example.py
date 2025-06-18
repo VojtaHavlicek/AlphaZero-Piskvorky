@@ -38,6 +38,9 @@ class TinyResNet(nn.Module):
         self.res1 = ResidualBlock(64)
         self.res2 = ResidualBlock(64)
         self.res3 = ResidualBlock(64)
+        self.res4 = ResidualBlock(64)  # Adding an additional residual block for more depth
+        self.res5 = ResidualBlock(64)
+        self.res6 = ResidualBlock(64)
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(64, num_classes)
 
@@ -47,6 +50,9 @@ class TinyResNet(nn.Module):
         out = self.res1(out)
         out = self.res2(out)
         out = self.res3(out)
+        out = self.res4(out)
+        out = self.res5(out)
+        out = self.res6(out)
         out = self.pool(out)
         out = out.view(out.size(0), -1)  # Flatten the output
         return self.fc(out)
@@ -65,8 +71,43 @@ if __name__ == "__main__":
     testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
     testloader = torch.utils.data.DataLoader(testset, batch_size=64, shuffle=False, num_workers=2)
 
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    print("Using device:", device)
 
-    model = TinyResNet()
-    x = torch.randn(1, 3, 32, 32)  # 1 image, 3 channels, 32 x 32 pixels
-    output = model(x)
-    print(output.shape)  # Should be [1, num_classes]
+    model = TinyResNet().to(device)
+
+    import torch.optim as optim
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+    for epoch in range(10):
+        running_loss = 0.0
+
+        for i, (inputs, labels) in enumerate(trainloader):
+            inputs, labels = inputs.to(device), labels.to(device)
+
+            optimizer.zero_grad()
+
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            running_loss += loss.item()
+            if i % 100 == 99:
+                print(f"[{epoch + 1}, {i + 1}] loss: {running_loss / 100:.3f}")
+                running_loss = 0.0
+    print("Finished Training")
+
+    correct = 0
+    total = 0
+    model.eval()
+    with torch.no_grad():
+        for inputs, labels in testloader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    print(f"Test accuracy: {100 * correct / total:.2f}%")
