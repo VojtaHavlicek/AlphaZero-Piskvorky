@@ -20,8 +20,9 @@ class ResidualBlock(nn.Module):
     
 
 class AlphaZeroNet(nn.Module):
-    def __init__(self, board_size=8, num_blocks=5, num_channels=64):
+    def __init__(self, board_size=8, num_blocks=5):
         super().__init__()
+        num_channels = board_size * board_size # Number of channels in the network, can be adjusted
         self.board_size = board_size
 
         self.initial_conv = nn.Sequential(
@@ -63,9 +64,9 @@ class AlphaZeroNet(nn.Module):
 
 if __name__ == "__main__":
     # Example use. 
-    net = AlphaZeroNet(board_size=8)
+    net = AlphaZeroNet(board_size=5)
 
-    game = Gomoku(size=8)
+    game = Gomoku(size=5)
     encoded = game.encode() # this has a batch dimension alrady
 
     policy_logits, value = net(encoded)

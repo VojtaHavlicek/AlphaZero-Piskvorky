@@ -27,7 +27,6 @@ def ucb_score(parent, child, c_puct):
 class MCTS:
     def __init__(self, net, c_puct=1.0, num_simulations=100):
         self.net = net 
-        self.device = next(self.net.parameters()).device
         self.c_puct = c_puct
         self.num_simulations = num_simulations
 
@@ -62,7 +61,6 @@ class MCTS:
         """Evaluate the game state using the neural network."""
         with torch.no_grad():
             encoded = game.encode()
-            encoded = encoded.to(next(self.net.parameters()).device)
             policy_logits, value = self.net(encoded)
             policy = torch.softmax(policy_logits, dim=-1)
         return policy.squeeze(0).cpu().numpy(), value.item() 
@@ -97,38 +95,21 @@ class MCTS:
         visit_counts = torch.tensor([
             child.N for child in root.children.values()
         ], dtype=torch.float32)
-
-        actions = list(root.children.keys())
-
         if temperature == 0:
-            best_action = actions[visit_counts.argmax().item()]
+            best_action = list(root.children.keys())[visit_counts.argmax().item()]
             policy = torch.zeros(root.game.size * root.game.size)
             index = best_action[0] * root.game.size + best_action[1]
             policy[index] = 1.0
             return policy, best_action
-        
-        if visit_counts.sum() == 0:
-            # All children unexplored (rare, but safe fallback)
-            probs = torch.ones(len(actions)) / len(actions)
         else:
             counts = visit_counts ** (1 / temperature)
             probs = counts / counts.sum()
-
-        # Handle NaN, inf, and negative values in probabilities
-        probs = torch.nan_to_num(probs, nan=0.0, posinf=0.0, neginf=0.0)
-        probs = torch.clamp(probs, min=0)
-        if probs.sum() == 0:
-            probs = torch.ones_like(probs) / len(probs)
-        else:
-            probs /= probs.sum()
-
-        policy = torch.zeros(root.game.size * root.game.size)
-        for i, action in enumerate(actions):
-            index = action[0] * root.game.size + action[1]
-            policy[index] = probs[i]
-
-        action = actions[torch.multinomial(probs, 1).item()]
-        return policy, action
+            policy = torch.zeros(root.game.size * root.game.size)
+            for i, action in enumerate(root.children.keys()):
+                index = action[0] * root.game.size + action[1]
+                policy[index] = probs[i]
+            action = list(root.children.keys())[torch.multinomial(probs, 1).item()]
+            return policy, action
         
 if __name__ == "__main__":
     from net import AlphaZeroNet  # Assuming you have a neural network defined in net.py

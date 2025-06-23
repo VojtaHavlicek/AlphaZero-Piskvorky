@@ -27,10 +27,10 @@ class Game:
         return new_game
 
 class Gomoku(Game):
-    def __init__(self, size=8):
+    def __init__(self, size=8, win_length=5):
         super().__init__(size)
         self._winner = None
-        self.win_length = 5
+        self.win_length = win_length
 
     def get_legal_actions(self) -> list:
         """Return a list of legal actions for the current player."""
