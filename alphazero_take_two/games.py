@@ -17,7 +17,7 @@ class Game:
         pass
     def get_winner(self) -> int:
         pass
-    def encode(self) -> torch.Tensor:
+    def encode(self, device=None) -> torch.Tensor:
         pass
     def clone(self) -> 'Game':
         """Return a deep copy of the game state."""
@@ -108,7 +108,7 @@ class Gomoku(Game):
             return None
         return self._winner if self._winner is not None else 0
     
-    def encode(self) -> torch.Tensor:
+    def encode(self, device='cpu') -> torch.Tensor:
         """
         Encode the game state as a tensor.
         
@@ -119,7 +119,7 @@ class Gomoku(Game):
 
         MARK: Used in AlphaZero's neural network input! 
         """
-        encoded = torch.zeros((3, self.size, self.size), dtype=torch.float32)
+        encoded = torch.zeros((3, self.size, self.size), dtype=torch.float32, device=device)
         for r in range(self.size):
             for c in range(self.size):
                 if self.board[r][c] == 1:
@@ -132,7 +132,7 @@ class Gomoku(Game):
     
     def clone(self) -> 'Gomoku':
         """Return a deep copy of the game state."""
-        new_game = Gomoku(self.size)
+        new_game = Gomoku(self.size, self.win_length)
         new_game.board = [row[:] for row in self.board]
         new_game.current_player = self.current_player
         return new_game
