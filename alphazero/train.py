@@ -12,10 +12,11 @@ import torch
 
 from net import TicTacToeNet
 from games import TicTacToe # NOTE: Pack the recommended ML model into metadata? 
-from promoter import ModelPromoter
-from replay_buffer import ReplayBuffer
 from self_play import SelfPlayManager
-from alphazero.trainer import NeuralNetworkTrainer 
+from replay_buffer import ReplayBuffer
+from trainer import NeuralNetworkTrainer 
+from evaluator import ModelEvaluator
+from promoter import ModelPromoter
 
 
  # --- Parameters ---
@@ -27,6 +28,25 @@ BATCH_SIZE = 64
 MODEL_DIR = "models"
 
 
+import torch
+
+def models_are_equal(model1: torch.nn.Module, model2: torch.nn.Module) -> bool:
+    """
+    Returns True if all parameters in both models are bitwise equal,
+    after moving model2's parameters to model1's device.
+    """
+    device = next(model1.parameters()).device
+    state_dict1 = model1.state_dict()
+    state_dict2 = model2.state_dict()
+
+    for k in state_dict1:
+        p1 = state_dict1[k]
+        p2 = state_dict2[k].to(device)
+        if not torch.equal(p1, p2):
+            return False
+    return True
+
+
 if __name__ == "__main__":
 
     # Set up multiprocessing for MPS backend
@@ -36,31 +56,43 @@ if __name__ == "__main__":
 
     # Initialize network, promoter, and replay buffer
     net = TicTacToeNet().to(device)
-    self_play_manager = SelfPlayManager(TicTacToe)  
+    self_play_manager = SelfPlayManager(net, TicTacToe)  
     buffer = ReplayBuffer(capacity=5_000)
-    promoter = ModelPromoter(MODEL_DIR)
+    evaluator = ModelEvaluator(TicTacToe)
+    promoter = ModelPromoter(model_dir=MODEL_DIR, evaluator=evaluator, net_class=TicTacToeNet)
     trainer = NeuralNetworkTrainer(net, device=device)
+    
 
     # Go through the training loop
     for episode in range(1, NUM_EPISODES + 1):
         print(f"EPISODE: {episode} \n---------------------------")
 
         # ---- Self-play games ----
-        data = self_play_manager.generate_self_play(net, 
-                                                    num_games=NUM_SELF_PLAY_GAMES,
+        data = self_play_manager.generate_self_play(num_games=NUM_SELF_PLAY_GAMES,
                                                     num_workers=4)
         
+        print(f"[Buffer]: size: {len(buffer)}")
         buffer.add(data) # Add data to the replay buffer
-        print(f"[Buffer]: games added, current size: {len(buffer)}")
+        print(f"[Buffer]: samples added, current size: {len(buffer)}")
 
         # ---- Train ----
-        trainer.train(buffer, batch_size=BATCH_SIZE, epochs=10)
+        print(f"[Trainer] Training on {len(buffer)} examples...")
+        examples = buffer.sample_batch(BATCH_SIZE)
+        trainer.train(examples, epochs=10)
+        print(f"[Trainer] Training complete.")
 
         # ---- Evaluate and promote if better ----
-        win_rate = evaluate_models(net, best_net, num_games=NUM_SELF_PLAY_GAMES)
-        promoter.promote_if_better(net, best_net, win_rate, metadata={"episode": episode, "buffer_size": len(buffer)})
-        if promoter.best_path:
-            best_net.load_state_dict(torch.load(promoter.best_path, map_location=device))
+        best_net = promoter.get_best_model()
+        if models_are_equal(net, best_net):
+            print("⚠️ Candidate model is identical to the baseline.")
+        else:
+            print("✅ Models differ — evaluation makes sense.")
+        win_rate, metrics = promoter.evaluate_and_maybe_promote(net, metadata={"episode": episode})
+
+        print()
+        print("----- Evaluation complete -----")
+        # Optional: Print summary
+        print(f"[Summary] Win rate: {win_rate:.2%} | Metrics: {metrics}")
 
         # Ensure the net is on the correct device
         net = net.to(device)

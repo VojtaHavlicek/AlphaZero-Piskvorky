@@ -112,4 +112,3 @@ class TicTacToeNet(nn.Module):
         value = torch.tanh(self.fully_connected_value(x))
 
         return policy_logits, value  # Return policy logits and value output
-

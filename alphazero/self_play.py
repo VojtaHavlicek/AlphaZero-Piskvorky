@@ -145,7 +145,7 @@ class SelfPlayManager:
         print(f"[SelfPlayManager] Collecting {num_games} games with {num_workers} workers...")
 
         results = []
-        with tqdm(total=num_games, desc="Self-play", ncols=80) as pbar:
+        with tqdm(total=num_games, desc="[SelfPlayManager] Self-play", ncols=80) as pbar:
             for _ in range(num_games):
                 try:
                     data = result_queue.get(timeout=60)

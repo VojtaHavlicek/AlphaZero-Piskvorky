@@ -12,22 +12,26 @@ class AlphaZeroDataset(Dataset):
 
     def __getitem__(self, idx):
         state, policy, value = self.examples[idx]
-        return state, policy, value
+        return (
+            state.float(),
+            policy.float(),
+            torch.tensor(value, dtype=torch.float32) if not torch.is_tensor(value) else value.float()
+        )
 
 
 class NeuralNetworkTrainer:
-    def __init__(self, net, lr=1e-3, batch_size=64, device='cpu'):
-        self.net = net.to(device)
+    def __init__(self, net, lr=1e-3, batch_size=64, device=None):
+        if device is None:
+            device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
         self.device = device
+
+        self.net = net.to(self.device).to(torch.float32)
         self.batch_size = batch_size
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=lr)
         self.value_loss_fn = torch.nn.MSELoss()
         self.training_history = []
 
     def _prepare_data(self, examples):
-        """
-        Converts raw examples to a DataLoader with proper batching and device management.
-        """
         dataset = AlphaZeroDataset(examples)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
         return dataloader
@@ -38,23 +42,23 @@ class NeuralNetworkTrainer:
 
         print("[Trainer] Training started...")
 
-        for epoch in tqdm(range(epochs), desc=f"Epochs", ncols=80):
+        for epoch in tqdm(range(epochs), desc=f"[Trainer] Epochs", ncols=80):
             total_loss = 0
             total_policy_loss = 0
             total_value_loss = 0
 
             for state, policy, value in dataloader:
+                state = state.to(self.device, dtype=torch.float32)
+                policy = policy.to(self.device, dtype=torch.float32)
+                value = value.to(self.device, dtype=torch.float32).view(-1, 1)
 
-                # NOTE: this forces floats for now. 
-                state = state.to(self.device).float()
-                policy = policy.to(self.device).float()
-                value = value.to(self.device).float()
+                # Make sure model is still on correct device
+                self.net = self.net.to(self.device).to(torch.float32)
 
                 pred_policy, pred_value = self.net(state)
 
                 log_probs = F.log_softmax(pred_policy, dim=1)
                 loss_policy = -torch.sum(policy * log_probs) / policy.size(0)
-                value = value.view(-1, 1)  # Ensure value is of shape (batch_size, 1)
                 loss_value = self.value_loss_fn(pred_value, value)
                 loss = loss_policy + loss_value
 
@@ -65,7 +69,7 @@ class NeuralNetworkTrainer:
                 total_loss += loss.item()
                 total_policy_loss += loss_policy.item()
                 total_value_loss += loss_value.item()
-                
+
             self.training_history.append({
                 "loss": total_loss,
                 "policy": total_policy_loss,
@@ -79,7 +83,7 @@ class NeuralNetworkTrainer:
 
     def load(self, path):
         self.net.load_state_dict(torch.load(path, map_location=self.device))
-        self.net.to(self.device)
+        self.net = self.net.to(self.device).to(torch.float32)
 
     def eval(self):
         self.net.eval()
