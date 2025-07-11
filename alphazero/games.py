@@ -138,12 +138,27 @@ class Gomoku(Game):
                     encoded[2, r, c] = 1.0
         return encoded.view(1, 3, self.size, self.size) # PyTorch expects [1, C, H, W] format for CNNs
     
+    
     def clone(self) -> 'Gomoku':
         """Return a deep copy of the game state."""
         new_game = Gomoku(self.size, self.win_length)
         new_game.board = [row[:] for row in self.board]
         new_game.current_player = self.current_player
         return new_game
+    
+
+    def __repr__(self) -> str:
+        """
+        String representation of the Gomoku board.
+
+        Returns:
+            str: A string representation of the Gomoku board.
+        """
+        board_str = "\n".join(
+            " | ".join("X" if self.board[i * self.size + j] == 1 else "O" if self.board[i * self.size + j] != 0 else " " for j in range(self.size))
+            for i in range(self.size)
+        )
+        return f"Gomoku(\n{board_str}\n)"
     
 
         
