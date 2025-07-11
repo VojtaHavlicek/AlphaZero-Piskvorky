@@ -36,6 +36,8 @@ class ModelEvaluator:
                 mcts = player_order[0] if game.current_player == 1 else player_order[1]
                 _, action = mcts.run(game, temperature=0)
                 game = game.apply_action(action)
+                print(game)
+                print("------")
 
             winner = game.get_winner()
             if winner == 1:

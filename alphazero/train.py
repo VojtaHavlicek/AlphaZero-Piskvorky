@@ -87,7 +87,7 @@ if __name__ == "__main__":
             print("⚠️ Candidate model is identical to the baseline.")
         else:
             print("✅ Models differ — evaluation makes sense.")
-        win_rate, metrics = promoter.evaluate_and_maybe_promote(net, metadata={"episode": episode})
+        win_rate, metrics = promoter.evaluate_and_maybe_promote(net, num_games=10, metadata={"episode": episode})
 
         print()
         print("----- Evaluation complete -----")
