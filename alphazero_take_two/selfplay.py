@@ -13,15 +13,15 @@ from collections import deque
 import random
 
  # --- Parameters ---
-BOARD_SIZE = 5
-WIN_LENGTH = 4
+BOARD_SIZE = 3
+WIN_LENGTH = 3
 NUM_EPISODES = 100
 NUM_SELF_PLAY_GAMES = 100
 BATCH_SIZE = 64
 MODEL_DIR = "models"
 
 class ReplayBuffer:
-    def __init__(self, max_size=10_000):
+    def __init__(self, max_size=100_000):
         self.buffer = deque(maxlen=max_size)
 
     def add(self, examples):
@@ -38,8 +38,7 @@ class ReplayBuffer:
     def __len__(self):
         return len(self.buffer)
 
-BOARD_SIZE = 5  # Default board size for Gomoku
-WIN_LENGTH = 4  # Default win length for Gomoku
+
 
 def play_self_play_game(mcts:MCTS):
     game = Gomoku(size=BOARD_SIZE, win_length=WIN_LENGTH)
@@ -131,7 +130,7 @@ class AlphaZeroDataset(Dataset):
     
 
 
-def train_network(net, examples, epochs=5, batch_size=64, lr=1e-3):
+def train_network(net, examples, epochs=10, batch_size=64, lr=1e-3):
     dataset = AlphaZeroDataset(examples)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
@@ -161,10 +160,11 @@ def train_network(net, examples, epochs=5, batch_size=64, lr=1e-3):
 
         print(f"Epoch {epoch+1}: loss={total_loss/len(dataloader):.4f}")
 
+from tqdm import tqdm
 
 def evaluate_models(new_net, old_net, num_games=NUM_SELF_PLAY_GAMES):
     wins = 0
-    for i in range(num_games):
+    for i in tqdm(range(num_games)):
         player1 = MCTS(new_net, num_simulations=50)
         player2 = MCTS(old_net, num_simulations=50)
 
@@ -179,6 +179,11 @@ def evaluate_models(new_net, old_net, num_games=NUM_SELF_PLAY_GAMES):
         if (i % 2 == 0 and winner == 1) or (i % 2 == 1 and winner == -1):
             wins += 1
 
+        # terminate selfplay early.
+        if i >= 9 and (wins/(i+1) > 0.60 or wins/(i+1) < 0.40):
+            print("early termination")
+            return wins/(i+1)
+
     return wins / num_games
 
 
@@ -188,14 +193,14 @@ from datetime import datetime
 from torch.multiprocessing import cpu_count
 
 class ModelPromoter:
-    def __init__(self, model_dir, threshold=0.55):
+    def __init__(self, model_dir, threshold=0.50):
         self.model_dir = model_dir
         os.makedirs(model_dir, exist_ok=True)
         self.best_path = None
         self.threshold = threshold
 
     def promote_if_better(self, candidate_net, base_net, win_rate, metadata=None):
-        if win_rate >= self.threshold:
+        if win_rate > self.threshold:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             model_path = os.path.join(self.model_dir, f"model_{timestamp}.pt")
             torch.save(candidate_net.state_dict(), model_path)
@@ -342,12 +347,15 @@ if __name__ == "__main__":
 
         # Train network on buffer
         print("TRAINING NETWORK...")
-        train_network(net, list(buffer.sample(1024)), epochs=5)
+        train_network(net, list(buffer.sample(1024)), epochs=10)
 
+        print("Training finished, evaluating...")
         # Evaluate model against best
         win_rate = evaluate_models(net, best_net, num_games=NUM_SELF_PLAY_GAMES)
 
+        print(f"Attempting promotion. Current best model: {promoter.best_path}")
         # Attempt promotion
+
         promoter.promote_if_better(net, best_net, win_rate, metadata={"episode": episode, "buffer_size": len(buffer)})
 
         # If promoted, update best_net

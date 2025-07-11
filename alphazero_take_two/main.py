@@ -9,8 +9,8 @@ from net import AlphaZeroNet
 from mcts import MCTS
 import torch
 
-def human_vs_ai(model_path="models/best_4x4.pt", board_size=BOARD_SIZE):
-    net = AlphaZeroNet(board_size=BOARD_SIZE, num_blocks=5)
+def human_vs_ai(model_path="models/best_3x3.pt", board_size=BOARD_SIZE):
+    net = AlphaZeroNet(board_size=BOARD_SIZE, num_blocks=3)
     net.load_state_dict(torch.load(model_path, map_location="cpu"))
     net.eval()
 

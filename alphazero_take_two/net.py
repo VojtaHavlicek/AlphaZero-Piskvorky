@@ -20,7 +20,7 @@ class ResidualBlock(nn.Module):
     
 
 class AlphaZeroNet(nn.Module):
-    def __init__(self, board_size=8, num_blocks=5):
+    def __init__(self, board_size=8, num_blocks=3):
         super().__init__()
         num_channels = board_size * board_size # Number of channels in the network, can be adjusted
         self.board_size = board_size
@@ -46,9 +46,9 @@ class AlphaZeroNet(nn.Module):
             nn.BatchNorm2d(1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(self.board_size * self.board_size, 256),
+            nn.Linear(self.board_size * self.board_size, 64),
             nn.ReLU(),
-            nn.Linear(256, 1),  # Final output for value head
+            nn.Linear(64, 1),  # Final output for value head
             nn.Tanh()  # Value output in range [-1, 1]
         )
 
