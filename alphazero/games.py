@@ -1,3 +1,13 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Filename: promoter.py
+Author: Vojtěch Havlíček
+Created: 2025-07-11
+Description: Abstract game class and Gomoku implementation for AlphaZero algorithm.
+License: MIT
+"""
+
 # Note: Multiplayer games? 
 import torch
 import torch.nn as nn

@@ -1,3 +1,13 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Filename: promoter.py
+Author: Vojtěch Havlíček
+Created: 2025-07-11
+Description: Monte Carlo Tree Search (MCTS) implementation for the AlphaZero algorithm.
+License: MIT
+"""
+
 import torch
 from games import Gomoku
 

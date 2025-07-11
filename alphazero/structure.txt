@@ -1,0 +1,13 @@
+.
+├── __init__.py
+├── games.py           - contains the definition of games that can be trained using the model, including an abstract class for building new ones.
+├── main.py            - use this to train and self play. 
+├── mcts.py            - implementation of Monte-Carlo tree search. 
+├── net.py             - neural net used by AlphaZero. 
+├── promoter.py        - evaluates and promotes learned models based on their performance. 
+├── replay_buffer.py   - stores self-play data. 
+├── self_play.py       - manages self_play during training.
+├── structure.txt      - this. 
+└── train.py           - manages the training loop, including self-play.
+
+1 directory, 10 files

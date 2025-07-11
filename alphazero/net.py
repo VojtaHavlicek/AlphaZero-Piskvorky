@@ -1,3 +1,13 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Filename: promoter.py
+Author: Vojtěch Havlíček
+Created: 2025-07-11
+Description: Neural network to be used with AlphaZero algorithm.
+License: MIT
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

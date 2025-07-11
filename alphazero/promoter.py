@@ -1,11 +1,18 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Filename: promoter.py
+Author: Vojtěch Havlíček
+Created: 2025-07-11
+Description: Keeps track of the best model and promotes a new model if it exceeds a win rate threshold.
+License: MIT
+"""
+
 import torch
 import os
 from datetime import datetime
 
 class ModelPromoter:
-    """
-    Keeps track of the best model and promotes a new model if it exceeds a win rate threshold.
-    """
     def __init__(self, model_dir, threshold=0.50):
         self.model_dir = model_dir
         os.makedirs(model_dir, exist_ok=True)

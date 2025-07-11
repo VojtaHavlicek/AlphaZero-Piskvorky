@@ -1,3 +1,13 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Filename: promoter.py
+Author: Vojtěch Havlíček
+Created: 2025-07-11
+Description: Training loop for the engine.
+License: MIT
+"""
+
 import random
 import mlx.core as mx
 import mlx.nn as nn
@@ -6,8 +16,8 @@ from collections import deque
 import numpy as np
 
 # ---
-from game import Gomoku
-from model import AZNet, mcts, Node
+from games import Gomoku
+
 from dataclasses import dataclass
 
 
@@ -18,24 +28,7 @@ class TrainingExample:
     value: float
 
 # --- Replay Buffer --- 
-class ReplayBuffer:
-    """ Buffer for storing training examples from self-play games. """
-    def __init__(self, capacity = 10000): 
-        self.buffer = deque(maxlen=capacity)
 
-    def add_game(self, game_examples):
-        self.buffer.extend(game_examples)
-
-    def sample_batch(self, batch_size):
-        batch = random.sample(self.buffer, batch_size)
-        states = mx.stack([ex.state for ex in batch])
-        policies = mx.stack([ex.policy for ex in batch])
-        values = mx.array([ex.value for ex in batch], dtype=mx.float32)
-
-        return states, policies, values
-    
-    def __len__(self): 
-        return len(self.buffer)
     
 # --- Utility ---
 def extract_policy_vector(visit_counts: dict, board_size: int = 8) -> mx.array:
