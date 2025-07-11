@@ -113,15 +113,3 @@ class TicTacToeNet(nn.Module):
 
         return policy_logits, value  # Return policy logits and value output
 
-
-if __name__ == "__main__":
-    # Example use. 
-    net = GomokuNet(board_size=5)
-
-    game = Gomoku(board_size=5)
-    encoded = game.encode() # this has a batch dimension alrady
-
-    policy_logits, value = net(encoded)
-
-    print("Policy logits shape:", policy_logits.shape)
-    print("Value shape:", value.shape)

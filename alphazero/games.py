@@ -11,7 +11,9 @@ License: MIT
 # Note: Multiplayer games? 
 import torch
 import torch.nn as nn
+import numpy as np
 
+# --- Abstract Game Class ---
 class Game:
     def __init__(self, board_size):
         self.size = board_size 
@@ -37,7 +39,7 @@ class Game:
         return new_game
 
 
-
+# --- Gomoku ---
 class Gomoku(Game):
     def __init__(self, board_size=8, win_length=5):
         super().__init__(board_size)
@@ -159,10 +161,133 @@ class Gomoku(Game):
             str: A string representation of the Gomoku board.
         """
         board_str = "\n".join(
-            " | ".join("X" if self.board[i * self.size + j] == 1 else "O" if self.board[i * self.size + j] != 0 else " " for j in range(self.size))
+            " | ".join("X" if self.board[i][j] == 1 else "O" if self.board[i][j] != 0 else " " for j in range(self.size))
             for i in range(self.size)
         )
         return f"Gomoku(\n{board_str}\n)"
     
+# --- TicTacToe ---
+class TicTacToe(Game):
+    def __init__(self):
+        super().__init__(board_size=3)
+        self._winner = None
 
-        
+    def get_legal_actions(self):
+        return [(r, c) for r in range(3) for c in range(3) if self.board[r][c] == 0]
+
+    def apply_action(self, action):
+        r, c = action
+        if self.board[r][c] != 0:
+            raise ValueError("Invalid move")
+        new_game = self.clone()
+        new_game.board[r][c] = self.current_player
+        new_game.current_player *= -1
+        return new_game
+
+    def _check_win(self, player):
+        for i in range(3):
+            if all(self.board[i][j] == player for j in range(3)):  # row
+                return True
+            if all(self.board[j][i] == player for j in range(3)):  # column
+                return True
+        if all(self.board[i][i] == player for i in range(3)):      # main diag
+            return True
+        if all(self.board[i][2 - i] == player for i in range(3)):  # anti diag
+            return True
+        return False
+
+    def is_terminal(self):
+        if self._winner is not None:
+            return True
+        for player in [1, -1]:
+            if self._check_win(player):
+                self._winner = player
+                return True
+        if all(self.board[r][c] != 0 for r in range(3) for c in range(3)):
+            self._winner = 0  # draw
+            return True
+        return False
+
+    def get_winner(self):
+        if not self.is_terminal():
+            return None
+        return self._winner
+
+    def encode(self, device='cpu') -> torch.Tensor:
+        """
+        Encode the TicTacToe game state as a tensor.
+        Returns (1, 3, 3, 3) tensor where:
+        [1, C, H, W] format:
+        - First dimension: Batch size (1 for single game).
+        - First channel: Player 1's pieces (1 for player, 0 otherwise).
+        - Second channel: Player -1's pieces (-1 for opponent, 0 otherwise).
+        - Third channel: Empty spaces (0 for empty, 1 otherwise).
+
+        Args:
+            device (str, optional): _description_. Defaults to 'cpu'.
+
+        Returns:
+            torch.Tensor: _description_
+        """
+        encoded = torch.zeros((3, 3, 3), dtype=torch.float32, device=device)
+        for r in range(3):
+            for c in range(3):
+                # One-hot encoding for TicTacToe
+                if self.board[r][c] == 1: 
+                    encoded[0, r, c] = 1.0
+                elif self.board[r][c] == -1:
+                    encoded[1, r, c] = 1.0
+                else:
+                    encoded[2, r, c] = 1.0
+        return encoded.view(1, 3, 3, 3)
+
+    def clone(self):
+        new_game = TicTacToe()
+        new_game.board = [row[:] for row in self.board]
+        new_game.current_player = self.current_player
+        new_game._winner = self._winner
+        return new_game
+
+    def symmetries(self, policy: torch.Tensor) -> list:
+        """
+        Generate all 8 symmetries of the board and corresponding policy.
+
+        Args:
+            policy (torch.Tensor): 1D tensor of shape (9,), policy over flattened board.
+
+        Returns:
+            List[Tuple[torch.Tensor, torch.Tensor]]: List of (state_tensor, policy_tensor) pairs.
+        """
+        assert policy.shape == (9,), "Policy must be flat (9,) tensor"
+        board_tensor = self.encode()[0]  # remove batch dimension: (3, 3, 3)
+        board_np = board_tensor.cpu().numpy()
+        policy_np = policy.view(3, 3).cpu().numpy()
+
+        symmetries = []
+        for k in range(4):  # 0, 90, 180, 270 degrees
+            for flip in [False, True]:
+                rotated_board = np.rot90(board_np, k, axes=(1, 2)).copy() # rotate height/width
+                rotated_policy = np.rot90(policy_np, k).copy()
+
+                if flip:
+                    rotated_board = np.flip(rotated_board, axis=2).copy() # horizontal flip (cols)
+                    rotated_policy = np.flip(rotated_policy, axis=1).copy()
+
+                state_tensor = torch.tensor(rotated_board, dtype=torch.float32)
+                policy_tensor = torch.tensor(rotated_policy.flatten(), dtype=torch.float32)
+
+                symmetries.append((state_tensor.unsqueeze(0), policy_tensor))
+
+        return symmetries
+
+
+    def __repr__(self):
+        symbol = {1: 'X', -1: 'O', 0: ' '}
+        return "\n".join(
+            " | ".join(symbol[self.board[r][c]] for c in range(3))
+            for r in range(3)
+        )
+    
+
+    
+

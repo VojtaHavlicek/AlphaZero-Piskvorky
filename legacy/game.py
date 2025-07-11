@@ -179,3 +179,6 @@ class Gomoku(GameState):
         symbols = {1: "X", -1: "O", 0: "."}
         board_str = "\n".join(" ".join(symbols[cell] for cell in row) for row in self.board)
         return f"Gomoku({self.get_current_player()}):\n{board_str}\n"
+    
+
+# --- TIC TAC TOE ---

@@ -9,17 +9,19 @@ License: MIT
 """
 
 import torch
-from net import GomokuNet
+
+from net import TicTacToeNet
+from games import TicTacToe # NOTE: Pack the recommended ML model into metadata? 
 from promoter import ModelPromoter
 from replay_buffer import ReplayBuffer
-from self_play import run_self_play_parallel, train_network, evaluate_models
-from games import Gomoku
+from self_play import SelfPlayManager
+
 
  # --- Parameters ---
 BOARD_SIZE = 3
 WIN_LENGTH = 3
-NUM_EPISODES = 100
-NUM_SELF_PLAY_GAMES = 250 # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
+NUM_EPISODES = 75
+NUM_SELF_PLAY_GAMES = 150 # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
 BATCH_SIZE = 64
 MODEL_DIR = "models"
 
@@ -31,26 +33,22 @@ if __name__ == "__main__":
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
     # Initialize network, promoter, and replay buffer
-    net = GomokuNet(board_size=BOARD_SIZE).to(device)
+    net = TicTacToeNet().to(device)
+    self_play_manager = SelfPlayManager(TicTacToe)  
+    buffer = ReplayBuffer(capacity=5_000)
     promoter = ModelPromoter(MODEL_DIR)
-    buffer = ReplayBuffer()
 
-    # Load the best model if it exists
-    best_net = GomokuNet(board_size=BOARD_SIZE).to(device)
-    best_net.load_state_dict(net.state_dict())
-
-
+    # Go through the training loop
     for episode in range(1, NUM_EPISODES + 1):
-        print(f"\n=== Episode {episode} ===")
+        print(f"EPISODE: {episode} \n---------------------------")
 
         # ---- Self-play games ----
         print("SELF-PLAYING GAMES...")
-        data = run_self_play_parallel(best_net, num_games=NUM_SELF_PLAY_GAMES,
-                                      board_size=BOARD_SIZE, win_length=WIN_LENGTH)
+        data = self_play_manager.generate_self_play(net, 
+                                                    num_games=NUM_SELF_PLAY_GAMES,
+                                                    num_workers=4)
         
-        data = [x for game in data for x in game]
         buffer.add(data)
-
         print(f"Buffer size: {len(buffer)}")
 
 
