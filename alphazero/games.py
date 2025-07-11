@@ -13,9 +13,6 @@ import torch
 import torch.nn as nn
 
 class Game:
-    """
-    Abstract class for a game
-    """
     def __init__(self, board_size):
         self.size = board_size 
         self.board = [[0] * board_size for _ in range(board_size)]
@@ -42,9 +39,6 @@ class Game:
 
 
 class Gomoku(Game):
-    """
-    Gomoku / Piskvorky 
-    """
     def __init__(self, board_size=8, win_length=5):
         super().__init__(board_size)
         self._winner = None
