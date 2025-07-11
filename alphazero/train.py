@@ -15,6 +15,7 @@ from games import TicTacToe # NOTE: Pack the recommended ML model into metadata?
 from promoter import ModelPromoter
 from replay_buffer import ReplayBuffer
 from self_play import SelfPlayManager
+from alphazero.trainer import NeuralNetworkTrainer 
 
 
  # --- Parameters ---
@@ -24,6 +25,7 @@ NUM_EPISODES = 75
 NUM_SELF_PLAY_GAMES = 150 # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
 BATCH_SIZE = 64
 MODEL_DIR = "models"
+
 
 if __name__ == "__main__":
 
@@ -37,25 +39,22 @@ if __name__ == "__main__":
     self_play_manager = SelfPlayManager(TicTacToe)  
     buffer = ReplayBuffer(capacity=5_000)
     promoter = ModelPromoter(MODEL_DIR)
+    trainer = NeuralNetworkTrainer(net, device=device)
 
     # Go through the training loop
     for episode in range(1, NUM_EPISODES + 1):
         print(f"EPISODE: {episode} \n---------------------------")
 
         # ---- Self-play games ----
-        print("SELF-PLAYING GAMES...")
         data = self_play_manager.generate_self_play(net, 
                                                     num_games=NUM_SELF_PLAY_GAMES,
                                                     num_workers=4)
         
-        buffer.add(data)
-        print(f"Buffer size: {len(buffer)}")
-
+        buffer.add(data) # Add data to the replay buffer
+        print(f"[Buffer]: games added, current size: {len(buffer)}")
 
         # ---- Train ----
-        print("TRAINING NETWORK...")
-        train_network(net, list(buffer.sample(BATCH_SIZE)), epochs=10) # TODO: understand batch size 
-        print("Training finished, evaluating...")
+        trainer.train(buffer, batch_size=BATCH_SIZE, epochs=10)
 
         # ---- Evaluate and promote if better ----
         win_rate = evaluate_models(net, best_net, num_games=NUM_SELF_PLAY_GAMES)

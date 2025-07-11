@@ -84,7 +84,7 @@ class SelfPlayManager:
                     #print("-------------")
 
                 winner = game.get_winner()
-                duration = time.time() - start_time
+                # duration = time.time() - start_time
               
                 
 
@@ -112,7 +112,7 @@ class SelfPlayManager:
         # Terminated 
 
 
-    def generate_self_play(self, num_games: int, num_workers: int = None) -> List:
+    def generate_self_play(self, num_games: int, num_workers: int = None, flatten=True) -> List:
         """
         Generate self-play games using multiple workers.
 
@@ -159,4 +159,9 @@ class SelfPlayManager:
             w.join()
 
         print(f"[SelfPlayManager] Collected {len(results)} games.")
+
+        # Flatten the results so this is plug an 
+        if flatten:
+            return [sample for game in results for sample in game]
         return results
+       
