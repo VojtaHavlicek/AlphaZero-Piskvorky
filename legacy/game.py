@@ -77,12 +77,7 @@ class TicTacToe(GameState):
     def encode(self):
         return mx.array(self.board, dtype=mx.float32)
 
-    def __repr__(self):
-        board_str = "\n".join(
-            " | ".join("X" if self.board[i * 3 + j] == 1 else "O" if self.board[i * 3 + j] != 0 else " " for j in range(3))
-            for i in range(3)
-        )
-        return f"TicTacToe(\n{board_str}\n)"
+ 
 
 
 # --- GOMOKU ---
