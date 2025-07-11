@@ -29,7 +29,13 @@ class ResidualBlock(nn.Module):
         return F.relu(out + residual)
     
 
-class AlphaZeroNet(nn.Module):
+class GomokuNet(nn.Module):
+    """
+    Use 
+
+    Args:
+        nn (_type_): _description_
+    """
     def __init__(self, board_size=8, num_blocks=3):
         super().__init__()
         num_channels = board_size * board_size # Number of channels in the network, can be adjusted
@@ -72,9 +78,45 @@ class AlphaZeroNet(nn.Module):
         return policy, value.squeeze(-1)  # Squeeze to remove the last dimension for value output
     
 
+class TicTacToeNet(nn.Module):
+    """
+    Neural network for TicTacToe game.
+    Significantly simpler architecture than GomokuNet. 
+    """
+    def __init__(self):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels=3,out_channels=32,kernel_size=3,padding=1), 
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32,out_channels=64,kernel_size=3,padding=1),
+            nn.ReLU(),
+        )
+        self.fully_connected_policy = nn.Linear(in_features = 64 * 3 * 3, out_features=9)  # 9 possible actions in TicTacToe
+        self.fully_connected_value = nn.Linear(in_features= 64 * 3 * 3, out_features=1) # Value output
+
+    def forward(self, x):
+        """
+        Forward pass through the network.
+
+        Args:
+            x (_type_): Batch of game state samples. 
+            Input tensor with shape (batch_size, 3, 3, 3) for TicTacToe.
+
+        Returns:
+            _type_: _description_
+        """
+        x = self.conv(x)
+        x = x.view(x.size(0), -1) # Flatten the tensor
+
+        policy_logits = F.log_softmax(self.fully_connected_policy(x), dim=-1)  # Policy logits
+        value = torch.tanh(self.fully_connected_value(x))
+
+        return policy_logits, value  # Return policy logits and value output
+
+
 if __name__ == "__main__":
     # Example use. 
-    net = AlphaZeroNet(board_size=5)
+    net = GomokuNet(board_size=5)
 
     game = Gomoku(board_size=5)
     encoded = game.encode() # this has a batch dimension alrady

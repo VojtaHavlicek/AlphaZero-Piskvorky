@@ -147,9 +147,9 @@ class MCTS:
         return pi.cpu(), action
 
 if __name__ == "__main__":
-    from net import AlphaZeroNet
+    from net import GomokuNet
     game = Gomoku(board_size=8)
-    net = AlphaZeroNet(board_size=8).to(torch.device('cpu'))
+    net = GomokuNet(board_size=8).to(torch.device('cpu'))
     mcts = MCTS(net, num_simulations=50)
     pi, act = mcts.run(game)
     print("Policy:", pi)

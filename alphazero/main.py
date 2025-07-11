@@ -13,14 +13,14 @@ import torch.nn as nn
 from games import Gomoku
 from alphazero.self_play import BOARD_SIZE, WIN_LENGTH
 from games import Gomoku
-from net import AlphaZeroNet
+from net import GomokuNet
 from mcts import MCTS
 import torch
 
 
 
 def human_vs_ai(model_path="models/best_3x3.pt", board_size=BOARD_SIZE):
-    net = AlphaZeroNet(board_size=BOARD_SIZE, 
+    net = GomokuNet(board_size=BOARD_SIZE, 
                        num_blocks=3)
     net.load_state_dict(torch.load(model_path, map_location="cpu"))
     net.eval()

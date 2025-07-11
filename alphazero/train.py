@@ -9,7 +9,7 @@ License: MIT
 """
 
 import torch
-from net import AlphaZeroNet
+from net import GomokuNet
 from promoter import ModelPromoter
 from replay_buffer import ReplayBuffer
 from self_play import run_self_play_parallel, train_network, evaluate_models
@@ -31,12 +31,12 @@ if __name__ == "__main__":
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
     # Initialize network, promoter, and replay buffer
-    net = AlphaZeroNet(board_size=BOARD_SIZE).to(device)
+    net = GomokuNet(board_size=BOARD_SIZE).to(device)
     promoter = ModelPromoter(MODEL_DIR)
     buffer = ReplayBuffer()
 
     # Load the best model if it exists
-    best_net = AlphaZeroNet(board_size=BOARD_SIZE).to(device)
+    best_net = GomokuNet(board_size=BOARD_SIZE).to(device)
     best_net.load_state_dict(net.state_dict())
 
 

@@ -18,7 +18,7 @@ from alphazero.replay_buffer import ReplayBuffer
 from alphazero.promoter import ModelPromoter
 from mcts import MCTS
 from games import Gomoku
-from net import AlphaZeroNet
+from net import GomokuNet
 
 
  # --- Parameters ---
@@ -184,11 +184,11 @@ def self_play_worker(task_queue:'mp.Queue', result_queue:'mp.Queue', net_state_d
     import time
     from queue import Empty
     import torch.multiprocessing as mp
-    from net import AlphaZeroNet  # import locally for multiprocessing compatibility
+    from net import GomokuNet  # import locally for multiprocessing compatibility
     torch.set_num_threads(1)
 
     # Recreate model and load weights
-    model = AlphaZeroNet(board_size=board_size)
+    model = GomokuNet(board_size=board_size)
     model.load_state_dict(net_state_dict)
     model.eval()
 
