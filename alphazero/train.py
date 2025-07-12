@@ -24,7 +24,7 @@ BOARD_SIZE = 3
 WIN_LENGTH = 3
 NUM_EPISODES = 75
 NUM_SELF_PLAY_GAMES = 150 # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
-BATCH_SIZE = 64
+BATCH_SIZE = 512
 MODEL_DIR = "models"
 
 
@@ -78,18 +78,18 @@ if __name__ == "__main__":
         # ---- Train ----
         print(f"[Trainer] Training on {BATCH_SIZE} examples...")
         examples = buffer.sample_batch(BATCH_SIZE)
-        trainer.train(examples, epochs=10)
+        trainer.train(examples, epochs=5)
         print(f"[Trainer] Training complete.")
         print("[Debug] Candidate policy logits (first 5):", net(torch.zeros(1, 3, 3, 3).to(device))[0][0][:5].detach().cpu().numpy())
 
 
         # ---- Evaluate and promote if better ----
         best_net = promoter.get_best_model()
-        if models_are_equal(net, best_net):
-            print("⚠️ Candidate model is identical to the baseline.")
-        else:
-            print("✅ Models differ — evaluation makes sense.")
-        win_rate, metrics = promoter.evaluate_and_maybe_promote(net, num_games=10, metadata={"episode": episode}, debug=True)
+        # if models_are_equal(net, best_net):
+        #     print("⚠️ Candidate model is identical to the baseline.")
+        # else:
+        #     print("✅ Models differ — evaluation makes sense.")
+        win_rate, metrics = promoter.evaluate_and_maybe_promote(net, num_games=10, metadata={"episode": episode}, debug=False)
 
         print()
         print("----- Evaluation complete -----")

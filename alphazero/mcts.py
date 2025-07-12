@@ -27,7 +27,7 @@ class Node:
 
 
 class MCTS:
-    def __init__(self, net, c_puct=1.0, num_simulations=100, cache_size=100_000):
+    def __init__(self, net, c_puct=1.4, num_simulations=250, cache_size=100_000):
         self.net = net
         self.device = next(net.parameters()).device
         self.c_puct = c_puct
@@ -53,7 +53,7 @@ class MCTS:
                 probs = torch.softmax(logits, dim=1).squeeze(0)
                 probs = torch.nan_to_num(probs, nan=0.0, posinf=0.0, neginf=0.0)
                 entropy = -(probs * probs.log()).sum().item()
-                print(f"[Debug] Root policy entropy: {entropy:.3f}")
+                #print(f"[Debug] Root policy entropy: {entropy:.3f}")
 
             policy_tensor = probs.cpu()
             self.eval_cache[key] = (policy_tensor, 0.0)

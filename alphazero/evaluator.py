@@ -68,8 +68,8 @@ class ModelEvaluator:
             else:
                 draws += 1
 
-        total = candidate_wins + baseline_wins + draws
-        win_rate = candidate_wins / total if total > 0 else 0.0
+        total = candidate_wins + baseline_wins
+        win_rate = candidate_wins / total if total > 0 else 0.5 # Default to 50% if no games were played
         print(f"[Evaluator]: Candidate Win Rate: {win_rate:.2%} (W:{candidate_wins} L:{baseline_wins} D:{draws})")
         return win_rate, {
             "wins": candidate_wins,

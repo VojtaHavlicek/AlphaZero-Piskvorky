@@ -50,10 +50,11 @@ The training pipeline loops over three things:
         - This can be adaptive (using Elo ratings or statistical significance testing)
 
 
-4. Miscelaneous:  
-    - Use temperature annealing for exploration early in training, low for precise eval later in the optimization 
-
-    - Dirichlet noise: add to the root node during self-play to encourage exploration 
+4. Miscelaneous notes:  
+    * MCTS
+        - Use temperature annealing for exploration early in training, low for precise eval later in the optimization 
+        - Dirichlet noise: add to the root node during self-play to encourage exploration 
+        - Very important: resolve policy search ties at random! 
 
     - Data augmentation: Augment data using rotation/reflections.
 

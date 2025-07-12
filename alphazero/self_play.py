@@ -75,13 +75,13 @@ class SelfPlayManager:
 
                 while not game.is_terminal():
                     temp = self.temperature_schedule(move_num)
-                    print(f"[Worker {task_id}] Starting move {move_num} with temperature {temp:.2f}")
+                    #print(f"[Worker {task_id}] Starting move {move_num} with temperature {temp:.2f}")
                     policy, action = mcts.run(game, temperature=temp, add_exploration_noise=True)
                     state = game.encode().squeeze(0)
                     history.append((state, policy, game.current_player))
                     game = game.apply_action(action)
                     move_num += 1
-                    print(f"[Worker {task_id}] Move {move_num}: Player {game.current_player}, Action: {action}, Temp: {temp:.2f} \n{game}")
+                    #print(f"[Worker {task_id}] Move {move_num}: Player {game.current_player}, Action: {action}, Temp: {temp:.2f} \n{game}")
 
                 winner = game.get_winner()
                 state = game.encode().squeeze(0)  
@@ -121,7 +121,6 @@ class SelfPlayManager:
         result_queue = mp.Queue()
 
         state_dict = self.net.to("cpu").state_dict()
-        print(state_dict.keys())
 
         for i in range(num_games):
             task_queue.put(i)
@@ -152,6 +151,7 @@ class SelfPlayManager:
 
         print(f"[SelfPlayManager] Collected {len(results)} games.")
 
+        # NOTE: Important - 
         # Flatten the results so this is plug an 
         if flatten:
             return [sample for game in results for sample in game]
