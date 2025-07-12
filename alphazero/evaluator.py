@@ -3,19 +3,13 @@ from tqdm import tqdm, trange
 from mcts import MCTS  # Assuming MCTS is defined in mcts.py
 
 class ModelEvaluator:
-    def __init__(self, game_class, mcts_class=None, mcts_params=None):
+    def __init__(self, game_class, mcts_class=None, mcts_params=None, print_games =False):
         self.game_class = game_class
         self.mcts_class = mcts_class if mcts_class is not None else MCTS
         self.mcts_params = mcts_params or {}
+        self.print_games = print_games  # Whether to print game states during evaluation
 
-    def evaluate(self, candidate_net, baseline_net, num_games=20):
-        """
-        Evaluate the candidate model against the baseline using alternating roles.
-
-        Returns:
-            win_rate: float (percentage of games candidate wins)
-            detailed_results: dict with win/loss/draw counts
-        """
+    def evaluate(self, candidate_net, baseline_net, num_games=20, debug=False):
         device = next(candidate_net.parameters()).device
         candidate_net.eval()
         baseline_net.eval()
@@ -30,12 +24,33 @@ class ModelEvaluator:
             mcts2 = self.mcts_class(baseline_net, **self.mcts_params)
 
             player_order = (mcts1, mcts2) if i % 2 == 0 else (mcts2, mcts1)
-            game.current_player = 1  # Always start with player 1
+            game.current_player = 1
+
+            move_sequence = []
+
+            if debug:
+                with torch.no_grad():
+                    encoded = game.encode().to(device)
+                    policy_logits, value = candidate_net(encoded)
+                    policy_probs = torch.softmax(policy_logits, dim=1)
+                    print("\n[Debug] Initial raw policy probabilities:")
+                    print(policy_probs.cpu().numpy().reshape(-1))
+                    print(f"[Debug] Initial value prediction: {value.item():.4f}")
 
             while not game.is_terminal():
                 mcts = player_order[0] if game.current_player == 1 else player_order[1]
-                _, action = mcts.run(game, temperature=0)
+                policy, action = mcts.run(game, temperature=0)
+
+                if debug:
+                    print(f"[Debug] Player {game.current_player} selects action: {action}")
+                    print(f"[Debug] Policy: {policy.cpu().numpy().round(3)}")
+                    print(f"[Debug] State after action {action}:\n{game}\n------")
+
+                move_sequence.append(action)
                 game = game.apply_action(action)
+
+            if debug:
+                print(f"[Debug] Game {i} move sequence: {move_sequence}")
                 print(game)
                 print("------")
 
@@ -60,5 +75,6 @@ class ModelEvaluator:
             "wins": candidate_wins,
             "losses": baseline_wins,
             "draws": draws,
-            "total": total
+            "total": total,
+            "win_rate": win_rate
         }

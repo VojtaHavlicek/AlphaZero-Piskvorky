@@ -52,6 +52,8 @@ class SelfPlayManager:
         self.temperature_schedule = temperature_schedule
 
     def _worker(self, task_queue: 'mp.Queue', result_queue: 'mp.Queue', state_dict):
+
+        import numpy as np
         torch.set_num_threads(1)
 
         model = self.net_class()
@@ -70,30 +72,19 @@ class SelfPlayManager:
                 game = self.game_class()  
                 history = []
                 move_num = 0
-                start_time = time.time()
 
                 while not game.is_terminal():
                     temp = self.temperature_schedule(move_num)
-                    policy, action = mcts.run(game, temperature=temp)
+                    print(f"[Worker {task_id}] Starting move {move_num} with temperature {temp:.2f}")
+                    policy, action = mcts.run(game, temperature=temp, add_exploration_noise=True)
                     state = game.encode().squeeze(0)
                     history.append((state, policy, game.current_player))
                     game = game.apply_action(action)
                     move_num += 1
-
-                    #print(game)
-                    #print("-------------")
+                    print(f"[Worker {task_id}] Move {move_num}: Player {game.current_player}, Action: {action}, Temp: {temp:.2f} \n{game}")
 
                 winner = game.get_winner()
-                # duration = time.time() - start_time
-              
-                
-
-                #print(f"Encode: \n {game.encode()} \n -----------------")
-                # Encode the terminal state and prepare the data
-
-
-                state = game.encode().squeeze(0)  # Squeeze to remove batch dimension
-                #print(f"Squeeze: \n {state} \n -----------------")
+                state = game.encode().squeeze(0)  
 
                 # Check if the encoding works: 
                 data = [
@@ -130,6 +121,7 @@ class SelfPlayManager:
         result_queue = mp.Queue()
 
         state_dict = self.net.to("cpu").state_dict()
+        print(state_dict.keys())
 
         for i in range(num_games):
             task_queue.put(i)

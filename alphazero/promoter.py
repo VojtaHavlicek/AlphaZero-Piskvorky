@@ -29,9 +29,9 @@ class ModelPromoter:
         model.load_state_dict(torch.load(self.best_path, map_location=self.device))
         return model
 
-    def evaluate_and_maybe_promote(self, candidate_net, num_games=20, metadata=None):
+    def evaluate_and_maybe_promote(self, candidate_net, num_games=20, metadata=None, debug=False):
         base_net = self.get_best_model()
-        win_rate, metrics = self.evaluator.evaluate(candidate_net, base_net, num_games=20)
+        win_rate, metrics = self.evaluator.evaluate(candidate_net, base_net, num_games=20, debug=debug)
 
         if win_rate > self.threshold:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

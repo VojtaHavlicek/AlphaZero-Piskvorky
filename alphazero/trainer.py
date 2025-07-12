@@ -70,6 +70,7 @@ class NeuralNetworkTrainer:
                 total_policy_loss += loss_policy.item()
                 total_value_loss += loss_value.item()
 
+            print(f"[Trainer] Epoch {epoch + 1}/{epochs} - Loss: {total_loss:.4f}, Policy Loss: {total_policy_loss:.4f}, Value Loss: {total_value_loss:.4f}")
             self.training_history.append({
                 "loss": total_loss,
                 "policy": total_policy_loss,

@@ -76,10 +76,12 @@ if __name__ == "__main__":
         print(f"[Buffer]: samples added, current size: {len(buffer)}")
 
         # ---- Train ----
-        print(f"[Trainer] Training on {len(buffer)} examples...")
+        print(f"[Trainer] Training on {BATCH_SIZE} examples...")
         examples = buffer.sample_batch(BATCH_SIZE)
         trainer.train(examples, epochs=10)
         print(f"[Trainer] Training complete.")
+        print("[Debug] Candidate policy logits (first 5):", net(torch.zeros(1, 3, 3, 3).to(device))[0][0][:5].detach().cpu().numpy())
+
 
         # ---- Evaluate and promote if better ----
         best_net = promoter.get_best_model()
@@ -87,12 +89,10 @@ if __name__ == "__main__":
             print("⚠️ Candidate model is identical to the baseline.")
         else:
             print("✅ Models differ — evaluation makes sense.")
-        win_rate, metrics = promoter.evaluate_and_maybe_promote(net, num_games=10, metadata={"episode": episode})
+        win_rate, metrics = promoter.evaluate_and_maybe_promote(net, num_games=10, metadata={"episode": episode}, debug=True)
 
         print()
         print("----- Evaluation complete -----")
         # Optional: Print summary
         print(f"[Summary] Win rate: {win_rate:.2%} | Metrics: {metrics}")
 
-        # Ensure the net is on the correct device
-        net = net.to(device)
