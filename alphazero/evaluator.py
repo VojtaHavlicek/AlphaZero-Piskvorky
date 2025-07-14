@@ -1,6 +1,6 @@
 import torch
 from tqdm import tqdm, trange
-from mcts import MCTS  # Assuming MCTS is defined in mcts.py
+from monte_carlo_tree_search import MCTS  # Assuming MCTS is defined in mcts.py
 
 class ModelEvaluator:
     def __init__(self, game_class, mcts_class=None, mcts_params=None, print_games =False):

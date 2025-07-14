@@ -11,40 +11,41 @@ License: MIT
 import torch
 
 from net import TicTacToeNet
-from games import TicTacToe # NOTE: Pack the recommended ML model into metadata? 
+from games import TicTacToe # NOTE: It may be worth to pakc the recommended ML model into game metadata.
 from self_play import SelfPlayManager
 from replay_buffer import ReplayBuffer
 from trainer import NeuralNetworkTrainer 
 from evaluator import ModelEvaluator
 from promoter import ModelPromoter
 
+# Ultimate TicTacToe implementation: 
+# Uses BATCH_SIZE = 2048, 
+# KL_DIVERGENCE loss, 
+# LR_SCHEDULE = lr_schedule={
+#            0: 5e-5,
+#            1000: 1e-4,
+#            2000: 2e-4,
+#            3000: 3e-4,
+#            50000: 1e-4,
+#            85000: 3e-5,
+#        },
+#        bnm_schedule={
+#            95000: 0.02,
+#        },
 
- # --- Parameters ---
+# https://github.com/arnowaczynski/utttai/blob/main/scripts/train_stage1.py 
+
+
+# --- Parameters ---
 BOARD_SIZE = 3
 WIN_LENGTH = 3
 NUM_EPISODES = 75
 NUM_SELF_PLAY_GAMES = 150 # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
-BATCH_SIZE = 512
+BATCH_SIZE = 512 
 MODEL_DIR = "models"
 
 
 import torch
-
-def models_are_equal(model1: torch.nn.Module, model2: torch.nn.Module) -> bool:
-    """
-    Returns True if all parameters in both models are bitwise equal,
-    after moving model2's parameters to model1's device.
-    """
-    device = next(model1.parameters()).device
-    state_dict1 = model1.state_dict()
-    state_dict2 = model2.state_dict()
-
-    for k in state_dict1:
-        p1 = state_dict1[k]
-        p2 = state_dict2[k].to(device)
-        if not torch.equal(p1, p2):
-            return False
-    return True
 
 
 if __name__ == "__main__":

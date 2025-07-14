@@ -10,7 +10,7 @@ License: MIT
 
 from typing import List
 import torch
-from mcts import MCTS
+from monte_carlo_tree_search import MCTS
 from tqdm import tqdm
 
 
@@ -25,14 +25,14 @@ import torch
 import torch.multiprocessing as mp
 from queue import Empty
 from typing import List, Type
-from mcts import MCTS
+from monte_carlo_tree_search import MCTS
 
 import time
 import torch
 import torch.multiprocessing as mp
 from queue import Empty
 from typing import List, Type, Callable
-from mcts import MCTS
+from monte_carlo_tree_search import MCTS
 
 def default_temperature_schedule(move: int) -> float:
     return 1.0 if move < 10 else 0.01
@@ -56,11 +56,13 @@ class SelfPlayManager:
         import numpy as np
         torch.set_num_threads(1)
 
-        model = self.net_class()
-        model.load_state_dict(state_dict)
-        model.eval()
+        policy_value_net = self.net_class()
+        policy_value_net.load_state_dict(state_dict)
+        policy_value_net.eval()
 
-        mcts = MCTS(model, **self.mcts_params)
+        mcts = MCTS(
+            game_class=self.game_class,
+            policy_value_net=policy_value_net)
 
         while True:
             try:
@@ -68,23 +70,25 @@ class SelfPlayManager:
             except Empty:
                 break
 
-            try:
-                game = self.game_class()  
+            try: 
+                game_state = self.game_class()
                 history = []
                 move_num = 0
 
-                while not game.is_terminal():
+                while not game_state.is_terminal():
                     temp = self.temperature_schedule(move_num)
                     #print(f"[Worker {task_id}] Starting move {move_num} with temperature {temp:.2f}")
-                    policy, action = mcts.run(game, temperature=temp, add_exploration_noise=True)
-                    state = game.encode().squeeze(0)
-                    history.append((state, policy, game.current_player))
-                    game = game.apply_action(action)
+                    policy, action = mcts.run(game_state=game_state, 
+                                              temperature=temp, 
+                                              add_exploration_noise=True)
+                    state = game_state.encode().squeeze(0)
+                    history.append((state, policy, game_state.current_player))
+                    game_state = game_state.apply_action(action)
                     move_num += 1
                     #print(f"[Worker {task_id}] Move {move_num}: Player {game.current_player}, Action: {action}, Temp: {temp:.2f} \n{game}")
 
-                winner = game.get_winner()
-                state = game.encode().squeeze(0)  
+                winner = game_state.get_winner()
+                state = game_state.encode().squeeze(0)  
 
                 # Check if the encoding works: 
                 data = [

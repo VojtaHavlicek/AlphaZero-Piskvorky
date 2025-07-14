@@ -10,23 +10,20 @@ License: MIT
 
 import torch
 import torch.nn as nn
-from games import Gomoku
-from alphazero.self_play import BOARD_SIZE, WIN_LENGTH
-from games import Gomoku
-from net import GomokuNet
-from mcts import MCTS
+from games import TicTacToe
+from net import TicTacToeNet
+from alphazero.monte_carlo_tree_search import MCTS
 import torch
 
 
 
-def human_vs_ai(model_path="models/best_3x3.pt", board_size=BOARD_SIZE):
-    net = GomokuNet(board_size=BOARD_SIZE, 
-                       num_blocks=3)
+def human_vs_ai(model_path="models/best_3x3.pt"):
+    net = TicTacToeNet()
     net.load_state_dict(torch.load(model_path, map_location="cpu"))
     net.eval()
 
-    game = Gomoku(board_size, win_length=WIN_LENGTH)
-    mcts = MCTS(net, num_simulations=100)
+    game = TicTacToe()
+    mcts = MCTS(net)
 
     print("You are playing as X (1). Type moves like: 3 4")
 

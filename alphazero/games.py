@@ -179,12 +179,13 @@ class TicTacToe(Game):
         r, c = action
         if self.board[r][c] != 0:
             raise ValueError("Invalid move")
-        new_game = self.clone()
+        new_game = self.clone() # Do I even need to clone? 
         new_game.board[r][c] = self.current_player
         new_game.current_player *= -1
         return new_game
 
     def _check_win(self, player):
+        """Check if the given player has won."""
         for i in range(3):
             if all(self.board[i][j] == player for j in range(3)):  # row
                 return True
