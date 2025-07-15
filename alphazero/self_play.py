@@ -35,7 +35,15 @@ from typing import List, Type, Callable
 from monte_carlo_tree_search import MCTS
 
 def default_temperature_schedule(move: int) -> float:
-    return 1.0 if move < 10 else 0.01
+    if move < 3:
+        # Early game, high temperature
+        return 1.0
+    elif move < 6:
+        # Mid game, moderate temperature
+        return 0.1
+    else:
+        # Late game, low temperature
+        return 0.01
 
 class SelfPlayManager:
     def __init__(
@@ -48,8 +56,9 @@ class SelfPlayManager:
         self.net = net
         self.net_class = type(net)
         self.game_class = game_class
-        self.mcts_params = mcts_params or {"num_simulations": 100}
+        self.mcts_params = mcts_params or {"num_simulations": 200}
         self.temperature_schedule = temperature_schedule
+
 
     def _worker(self, task_queue: 'mp.Queue', result_queue: 'mp.Queue', state_dict):
 

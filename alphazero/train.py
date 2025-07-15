@@ -17,7 +17,7 @@ from replay_buffer import ReplayBuffer
 from trainer import NeuralNetworkTrainer 
 from evaluator import ModelEvaluator
 from promoter import ModelPromoter
-from trainer import generate_bootstrap_dataset, minimax
+from trainer import generate_minimax_vs_random_dataset, minimax
 
 # Ultimate TicTacToe implementation: 
 # Uses BATCH_SIZE = 2048, 
@@ -40,13 +40,13 @@ from trainer import generate_bootstrap_dataset, minimax
 # --- Parameters ---
 BOARD_SIZE = 3
 WIN_LENGTH = 3
-NUM_EPISODES = 500
+NUM_EPISODES = 10
 NUM_SELF_PLAY_GAMES = 150 # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
-BATCH_SIZE = 64 
+BATCH_SIZE = 128
 NUM_EPOCHS = 10 
 EVALUATION_GAMES = 50
 BUFFER_CAPACITY = 1_000
-BOOTSTRAP = True
+BOOTSTRAP = False
 MODEL_DIR = "models"
 
 
@@ -69,14 +69,15 @@ if __name__ == "__main__":
     trainer = NeuralNetworkTrainer(net, device=device)
     
     
+    # TODO: Make sure not to contaminate the model directory with old models.
     # Optional: only do this if model has not trained before
     if BOOTSTRAP:
         print("[Bootstrap] Generating minimax dataset...")
-        bootstrap_data = generate_bootstrap_dataset(
+        bootstrap_data = generate_minimax_vs_random_dataset(
             game_class=TicTacToe,
             minimax_agent=minimax,
-            num_games=100,
-            max_depth=5,
+            num_games=BATCH_SIZE//4, 
+            max_depth=9,
         )
         buffer.add(bootstrap_data)
 

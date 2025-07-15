@@ -98,61 +98,73 @@ class NeuralNetworkTrainer:
 import torch
 from typing import List, Tuple
 
-def generate_bootstrap_dataset(
+import torch
+import random
+from typing import List, Tuple
+from tqdm import tqdm
+
+def generate_minimax_vs_random_dataset(
     game_class: type,
     minimax_agent,
     num_games: int = 100,
     max_depth: int = 5,
-) -> List[Tuple[torch.Tensor, torch.Tensor, float]]:
+) -> List[List[Tuple[torch.Tensor, torch.Tensor, float]]]:
     """
-    Generate a bootstrap dataset using minimax-vs-minimax games.
+    Generate a dataset of games played between a Minimax agent and a Random agent.
+    Format matches generate_self_play: a list of per-game histories.
 
     Args:
         game_class: A class implementing the Game interface.
-        minimax_agent: A function(game_state, depth, maximizing_player) -> (value, action)
-        num_games: Number of games to simulate
-        max_depth: Depth for the minimax agent
+        minimax_agent: A function(game_state, depth, maximizing_player, root_player) -> (value, action)
+        num_games: Number of games to simulate.
+        max_depth: Search depth for minimax.
 
     Returns:
-        List of (state_tensor, policy_tensor, value) tuples
-
-    TODO: add heuristic to the minimax agent to avoid deep recursion
+        List of per-game histories: List[List[(state_tensor, policy_tensor, value)]]
     """
-    dataset = []
+    all_games = []
 
     for game_index in tqdm(range(num_games), desc="[Bootstrap] Generating", ncols=80):
         game = game_class()
-        history = []
+
+        # Alternate who starts
+        minimax_player = 1 if game_index % 2 == 0 else -1
+        random_player = -minimax_player
+        game.current_player = 1
+
+        game_history = []
 
         while not game.is_terminal():
-            _, action = minimax(game, depth=9, maximizing_player=True, root_player=game.current_player)
+            current_player = game.current_player
+            size = game.size
+
+            # Choose action
+            if current_player == minimax_player:
+                _, action = minimax_agent(game, depth=max_depth, maximizing_player=True, root_player=current_player)
+            else:
+                legal_actions = game.get_legal_actions()
+                action = random.choice(legal_actions) if legal_actions else None
 
             if action is None:
-                break  # Defensive: terminal state reached or minimax gave up
+                break
 
-            state = game.encode().squeeze(0)  # shape: (3, board_size, board_size)
-            size = game.size
+            state = game.encode().squeeze(0)
             policy = torch.zeros(size * size, dtype=torch.float32)
-
             idx = action[0] * size + action[1]
             policy[idx] = 1.0
 
-            history.append((state, policy, game.current_player))
-
-           
+            game_history.append((state, policy, current_player))
             game = game.apply_action(action)
-            print(f"[Debug] State after action {action}:\n{game}\n------")
 
-            
-
-        # Get winner at the end
+        # Assign outcome value to each move in game history
         winner = game.get_winner()
-        for state, policy, player in history:
-            value = 1.0 if winner == player else -1.0 if winner == -player else 0.0
-            dataset.append((state, policy, value))
+        labeled_history = [
+            (state, policy, 1.0 if winner == player else -1.0 if winner == -player else 0.0)
+            for state, policy, player in game_history
+        ]
+        all_games.append(labeled_history)
 
-    return dataset
-
+    return all_games
 
 import random
 
