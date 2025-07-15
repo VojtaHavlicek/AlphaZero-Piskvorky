@@ -24,8 +24,9 @@ class ModelEvaluator:
             mcts1 = self.mcts_class(self.game_class, candidate_net, **self.mcts_params)
             mcts2 = self.mcts_class(self.game_class, baseline_net, **self.mcts_params)
 
-            player_order = (mcts1, mcts2) if i % 2 == 0 else (mcts2, mcts1)
             game.current_player = 1
+            player_order = (mcts1, mcts2) if i % 2 == 0 else (mcts2, mcts1)
+            
 
             move_sequence = []
 

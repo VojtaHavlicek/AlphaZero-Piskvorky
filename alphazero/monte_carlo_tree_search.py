@@ -169,6 +169,7 @@ class MCTS:
         if not states:
             return
 
+        self.policy_value_net.eval()  # Ensure the network is in evaluation mode
         batch = torch.cat(states, dim=0)
         with torch.no_grad():
             logits, values = self.policy_value_net(batch)

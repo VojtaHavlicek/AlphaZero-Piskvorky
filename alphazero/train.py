@@ -17,6 +17,7 @@ from replay_buffer import ReplayBuffer
 from trainer import NeuralNetworkTrainer 
 from evaluator import ModelEvaluator
 from promoter import ModelPromoter
+from trainer import generate_bootstrap_dataset, minimax
 
 # Ultimate TicTacToe implementation: 
 # Uses BATCH_SIZE = 2048, 
@@ -39,12 +40,13 @@ from promoter import ModelPromoter
 # --- Parameters ---
 BOARD_SIZE = 3
 WIN_LENGTH = 3
-NUM_EPISODES = 75
-NUM_SELF_PLAY_GAMES = 100 # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
+NUM_EPISODES = 500
+NUM_SELF_PLAY_GAMES = 150 # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
 BATCH_SIZE = 64 
 NUM_EPOCHS = 10 
-EVALUATION_GAMES = 20
+EVALUATION_GAMES = 50
 BUFFER_CAPACITY = 1_000
+BOOTSTRAP = True
 MODEL_DIR = "models"
 
 
@@ -56,7 +58,7 @@ if __name__ == "__main__":
     # Set up multiprocessing for MPS backend
     import torch.multiprocessing as mp
     mp.set_start_method("spawn", force=True)
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    device = "cpu" #torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
     # Initialize network, promoter, and replay buffer
     net = TicTacToeNet().to(device)
@@ -66,6 +68,18 @@ if __name__ == "__main__":
     promoter = ModelPromoter(model_dir=MODEL_DIR, evaluator=evaluator, net_class=TicTacToeNet)
     trainer = NeuralNetworkTrainer(net, device=device)
     
+    
+    # Optional: only do this if model has not trained before
+    if BOOTSTRAP:
+        print("[Bootstrap] Generating minimax dataset...")
+        bootstrap_data = generate_bootstrap_dataset(
+            game_class=TicTacToe,
+            minimax_agent=minimax,
+            num_games=100,
+            max_depth=5,
+        )
+        buffer.add(bootstrap_data)
+
 
     # Go through the training loop
     for episode in range(1, NUM_EPISODES + 1):

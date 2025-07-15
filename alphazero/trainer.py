@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 import torch.nn.functional as F
 from tqdm import tqdm
+import random
 
 class AlphaZeroDataset(Dataset):
     def __init__(self, examples):
@@ -92,3 +93,102 @@ class NeuralNetworkTrainer:
 
     def train_mode(self):
         self.net.train()
+
+
+import torch
+from typing import List, Tuple
+
+def generate_bootstrap_dataset(
+    game_class: type,
+    minimax_agent,
+    num_games: int = 100,
+    max_depth: int = 5,
+) -> List[Tuple[torch.Tensor, torch.Tensor, float]]:
+    """
+    Generate a bootstrap dataset using minimax-vs-minimax games.
+
+    Args:
+        game_class: A class implementing the Game interface.
+        minimax_agent: A function(game_state, depth, maximizing_player) -> (value, action)
+        num_games: Number of games to simulate
+        max_depth: Depth for the minimax agent
+
+    Returns:
+        List of (state_tensor, policy_tensor, value) tuples
+
+    TODO: add heuristic to the minimax agent to avoid deep recursion
+    """
+    dataset = []
+
+    for game_index in tqdm(range(num_games), desc="[Bootstrap] Generating", ncols=80):
+        game = game_class()
+        history = []
+
+        while not game.is_terminal():
+            _, action = minimax(game, depth=9, maximizing_player=True, root_player=game.current_player)
+
+            if action is None:
+                break  # Defensive: terminal state reached or minimax gave up
+
+            state = game.encode().squeeze(0)  # shape: (3, board_size, board_size)
+            size = game.size
+            policy = torch.zeros(size * size, dtype=torch.float32)
+
+            idx = action[0] * size + action[1]
+            policy[idx] = 1.0
+
+            history.append((state, policy, game.current_player))
+
+           
+            game = game.apply_action(action)
+            print(f"[Debug] State after action {action}:\n{game}\n------")
+
+            
+
+        # Get winner at the end
+        winner = game.get_winner()
+        for state, policy, player in history:
+            value = 1.0 if winner == player else -1.0 if winner == -player else 0.0
+            dataset.append((state, policy, value))
+
+    return dataset
+
+
+import random
+
+def minimax(game, depth, maximizing_player, root_player):
+    if game.is_terminal() or depth == 0:
+        winner = game.get_winner()
+        if winner == root_player:
+            return 1, None
+        elif winner == -root_player:
+            return -1, None
+        else:
+            return 0, None
+
+    best_value = float('-inf') if maximizing_player else float('inf')
+    best_actions = []
+
+    for action in game.get_legal_actions():
+        child = game.apply_action(action)
+        val, _ = minimax(child, depth - 1, not maximizing_player, root_player)
+
+        if maximizing_player:
+            if val > best_value:
+                best_value = val
+                best_actions = [action]
+            elif val == best_value:
+                best_actions.append(action)
+        else:
+            if val < best_value:
+                best_value = val
+                best_actions = [action]
+            elif val == best_value:
+                best_actions.append(action)
+
+    best_action = random.choice(best_actions) if best_actions else None
+    return best_value, best_action
+
+
+
+
