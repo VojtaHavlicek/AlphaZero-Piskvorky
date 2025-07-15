@@ -242,10 +242,10 @@ class MCTS:
             return policy.cpu(), best
 
         counts = visits ** (1.0 / temperature)
-        probs = counts / counts.sum()
+        probs = counts / counts.sum() if counts.sum() > 0 else torch.ones_like(counts) / len(counts)
         probs = torch.nan_to_num(probs, nan=0.0, posinf=0.0, neginf=0.0)
         probs = torch.clamp(probs, min=0)
-        probs /= probs.sum()
+        probs = probs / probs.sum() if probs.sum() > 0 else torch.ones_like(probs) / len(probs)
 
         policy = torch.zeros(root.game_state.size**2, dtype=torch.float32, device=self.device)
         for a, p in zip(actions, probs):

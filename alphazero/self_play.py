@@ -38,12 +38,12 @@ def default_temperature_schedule(move: int) -> float:
     if move < 3:
         # Early game, high temperature
         return 1.0
-    elif move < 6:
+    if move < 6:
         # Mid game, moderate temperature
         return 0.1
-    else:
-        # Late game, low temperature
-        return 0.01
+    
+    # Late game, low temperature
+    return 0.01
 
 class SelfPlayManager:
     def __init__(
@@ -90,12 +90,15 @@ class SelfPlayManager:
                     policy, action = mcts.run(game_state=game_state, 
                                               temperature=temp, 
                                               add_exploration_noise=True)
+                    
+                    
+                    #print(f"[Worker {task_id}] Policy: {policy.cpu().numpy().round(3)}")
                     state = game_state.encode().squeeze(0)
                     history.append((state, policy, game_state.current_player))
                     game_state = game_state.apply_action(action)
                     move_num += 1
                     #print(f"[Worker {task_id}] Move {move_num}: Player {game.current_player}, Action: {action}, Temp: {temp:.2f} \n{game}")
-
+                #print(f"[Worker {task_id}] Game finished after {move_num} moves.")
                 winner = game_state.get_winner()
                 state = game_state.encode().squeeze(0)  
 
@@ -116,7 +119,10 @@ class SelfPlayManager:
         # Terminated 
 
 
-    def generate_self_play(self, num_games: int, num_workers: int = None, flatten=True) -> List:
+    def generate_self_play(self, 
+                           num_games: int, 
+                           num_workers: int = None, 
+                           flatten=True) -> List:
         """
         Generate self-play games using multiple workers.
 
