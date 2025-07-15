@@ -57,10 +57,22 @@ class MCTS:
         self.device = next(policy_value_net.parameters()).device # NOTE: do I need this? 
         self.evaluation_cache = self._init_cache()
 
+
     def run(self, 
             game_state: Game, 
             temperature: float = 1.0, 
             add_exploration_noise: bool = False):
+        """
+        Runs the MCTS algorithm on the given game state.
+
+        Args:
+            game_state (Game): _description_
+            temperature (float, optional): _description_. Defaults to 1.0.
+            add_exploration_noise (bool, optional): _description_. Defaults to False.
+
+        Returns:
+            _type_: _description_
+        """
         
         # --- Initialize root ---
         root = Node(game_state=game_state)
@@ -90,6 +102,15 @@ class MCTS:
 
 
     def _select_and_expand(self, root: Node):
+        """
+        Selects a path from the root node to a leaf node, expanding nodes along the way.
+
+        Args:
+            root (Node): _description_
+
+        Returns:
+            _type_: _description_
+        """
         node = root
         path = [node]
         while node.is_expanded() and not node.game_state.is_terminal():
@@ -99,6 +120,19 @@ class MCTS:
 
 
     def _evaluate_terminal(self, game_state: Game, root_player: int) -> float:
+        """
+        Evaluates the terminal game state to determine the outcome.
+
+        Args:
+            game_state (Game): _description_
+            root_player (int): _description_
+
+        Raises:
+            ValueError: _description_
+
+        Returns:
+            float: _description_
+        """
         winner = game_state.get_winner()
         if winner == 0:
             return 0.0
@@ -111,10 +145,18 @@ class MCTS:
 
 
     def _evaluate_and_backpropagate(self, pending):
+        """
+        Evaluates the game states in the pending list using the policy-value network.
+
+        Args:
+            pending (list): A list of tuples where each tuple contains a Node and its path.
+            Each Node represents a game state that needs to be evaluated.
+            The path is a list of nodes leading to the leaf node.
+        """
         states, keys, paths = [], [], []
 
         for node, path in pending:
-            key = self._game_to_key(node.game_state)
+            key = self._game_state_to_key(node.game_state)
             if key in self.evaluation_cache:
                 policy_tensor, value = self.evaluation_cache[key]
                 self._expand(node, policy_tensor.numpy())
@@ -162,6 +204,14 @@ class MCTS:
 
 
     def _backpropagate(self, path: list, value: float):
+        """
+        Backpropagates the value through the path from leaf to root.
+        This updates the visit count (N), total value (W), and mean value (Q) for each node in the path.
+
+        Args:
+            path (list): _description_
+            value (float): _description_
+        """
         for node in reversed(path):
             node.N += 1
             node.W += value
@@ -170,6 +220,16 @@ class MCTS:
 
 
     def _get_policy(self, root: Node, temperature: float):
+        """
+        Returns the policy distribution over actions from the root node.
+
+        Args:
+            root (Node): The root node of the MCTS tree.
+            temperature (float): Temperature parameter for softmax distribution.
+
+        Returns:
+            tuple: A tuple containing the policy distribution tensor and the selected action.
+        """
         visits = torch.tensor([c.N for c in root.children.values()], device=self.device, dtype=torch.float32)
         actions = list(root.children.keys())
 
@@ -213,6 +273,7 @@ class MCTS:
     def _select_child(self, node: Node) -> Node:
         """
         Selects a child node based on the UCB score.
+
         Args:
             node (Node): The parent node from which to select a child.
         
@@ -237,8 +298,11 @@ class MCTS:
     def _expand_root(self, root: Node):
         """
         Expands the root node using the network policy. Adds to eval cache if missing.
+
+        Args:
+            root (Node): The root node to expand.
         """
-        key = self._game_to_key(root.game_state)
+        key = self._game_state_to_key(root.game_state)
         if key in self.evaluation_cache:
             policy_tensor, _ = self.evaluation_cache[key]
         else:
@@ -259,11 +323,12 @@ class MCTS:
 
         self._expand(root, policy_tensor.numpy())
 
+
     def _add_dirichlet_noise(self, root, alpha=0.3, epsilon=0.25):
         """
         Adds Dirichlet noise to the root node's prior to encourage exploration.
         """
-        actions = list(root.children.keys())
+        actions = list(root.children.keys()) #  Get all legal actions from the root node
         num_actions = len(actions)
         if num_actions == 0:
             return  # nothing to do
@@ -279,8 +344,16 @@ class MCTS:
         return OrderedDict()
 
    
-    def _game_to_key(self, game: Game):
-        # Flattened CPU float32 view of the state
-        return tuple(game.encode(device='cpu').view(-1).tolist())
+    def _game_state_to_key(self, game_state: Game):
+        """
+        Converts a game state to a unique key for caching.
+
+        Args:
+            game_state (Game): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        return tuple(game_state.encode(device='cpu').view(-1).tolist())
 
 

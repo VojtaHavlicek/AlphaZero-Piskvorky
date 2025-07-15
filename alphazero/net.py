@@ -80,6 +80,32 @@ class GomokuNet(nn.Module):
 
 class TicTacToeNet(nn.Module):
     """
+    Dead simple neural network for TicTacToe game.
+
+    Args:
+        nn (_type_): _description_
+    """
+    def __init__(self):
+        super().__init__()
+        self.flatten = nn.Flatten()
+        self.fc1 = nn.Linear(3 * 3 * 3, 128)
+        self.fc2 = nn.Linear(128, 64)
+
+        self.policy_head = nn.Linear(64, 9)
+        self.value_head = nn.Linear(64, 1)
+
+    def forward(self, x):
+        x = self.flatten(x)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+
+        policy_logits = F.log_softmax(self.policy_head(x), dim=-1)
+        value = torch.tanh(self.value_head(x))
+        return policy_logits, value
+
+
+class TicTacToeNetConv(nn.Module):
+    """
     Neural network for TicTacToe game.
     Significantly simpler architecture than GomokuNet. 
     """

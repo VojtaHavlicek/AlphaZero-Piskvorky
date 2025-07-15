@@ -40,8 +40,11 @@ from promoter import ModelPromoter
 BOARD_SIZE = 3
 WIN_LENGTH = 3
 NUM_EPISODES = 75
-NUM_SELF_PLAY_GAMES = 150 # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
-BATCH_SIZE = 512 
+NUM_SELF_PLAY_GAMES = 100 # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
+BATCH_SIZE = 64 
+NUM_EPOCHS = 10 
+EVALUATION_GAMES = 20
+BUFFER_CAPACITY = 1_000
 MODEL_DIR = "models"
 
 
@@ -58,7 +61,7 @@ if __name__ == "__main__":
     # Initialize network, promoter, and replay buffer
     net = TicTacToeNet().to(device)
     self_play_manager = SelfPlayManager(net, TicTacToe)  
-    buffer = ReplayBuffer(capacity=5_000)
+    buffer = ReplayBuffer(capacity=BUFFER_CAPACITY)
     evaluator = ModelEvaluator(TicTacToe)
     promoter = ModelPromoter(model_dir=MODEL_DIR, evaluator=evaluator, net_class=TicTacToeNet)
     trainer = NeuralNetworkTrainer(net, device=device)
@@ -79,7 +82,7 @@ if __name__ == "__main__":
         # ---- Train ----
         print(f"[Trainer] Training on {BATCH_SIZE} examples...")
         examples = buffer.sample_batch(BATCH_SIZE)
-        trainer.train(examples, epochs=5)
+        trainer.train(examples, epochs=NUM_EPOCHS)
         print(f"[Trainer] Training complete.")
         print("[Debug] Candidate policy logits (first 5):", net(torch.zeros(1, 3, 3, 3).to(device))[0][0][:5].detach().cpu().numpy())
 
@@ -90,7 +93,7 @@ if __name__ == "__main__":
         #     print("⚠️ Candidate model is identical to the baseline.")
         # else:
         #     print("✅ Models differ — evaluation makes sense.")
-        win_rate, metrics = promoter.evaluate_and_maybe_promote(net, num_games=10, metadata={"episode": episode}, debug=False)
+        win_rate, metrics = promoter.evaluate_and_maybe_promote(net, num_games=EVALUATION_GAMES, metadata={"episode": episode}, debug=True)
 
         print()
         print("----- Evaluation complete -----")

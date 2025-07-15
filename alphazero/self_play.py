@@ -48,7 +48,7 @@ class SelfPlayManager:
         self.net = net
         self.net_class = type(net)
         self.game_class = game_class
-        self.mcts_params = mcts_params or {"num_simulations": 50}
+        self.mcts_params = mcts_params or {"num_simulations": 100}
         self.temperature_schedule = temperature_schedule
 
     def _worker(self, task_queue: 'mp.Queue', result_queue: 'mp.Queue', state_dict):

@@ -14,12 +14,13 @@ from collections import deque
 
 
 class ReplayBuffer:
-    def __init__(self, capacity=100_000):
+    def __init__(self, capacity):
         self.buffer = deque(maxlen=capacity)
 
     def add(self, game_examples):
         """
         Add a list of game examples to the buffer.
+        FIFO 
 
         Args:
             game_examples (list): List of game examples to add.

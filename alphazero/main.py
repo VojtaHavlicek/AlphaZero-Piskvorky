@@ -12,18 +12,31 @@ import torch
 import torch.nn as nn
 from games import TicTacToe
 from net import TicTacToeNet
-from alphazero.monte_carlo_tree_search import MCTS
+from monte_carlo_tree_search import MCTS
 import torch
 
 
-
-def human_vs_ai(model_path="models/best_3x3.pt"):
-    net = TicTacToeNet()
-    net.load_state_dict(torch.load(model_path, map_location="cpu"))
-    net.eval()
-
+# "models/best_3x3.pt"
+def human_vs_ai(model_path=None,
+                model=None):
+    
+    if model is not None:
+        net = model
+    elif model_path is not None:
+        net = TicTacToeNet()
+        net.load_state_dict(torch.load(model_path, map_location="cpu"))
+        net.eval()
+    else:
+        try:
+            net = TicTacToeNet()
+            net.load_state_dict(torch.load("models/best_3x3.pt", map_location="cpu"))
+            net.eval()
+        except FileNotFoundError:
+            print("No model found. Please provide a valid model path or load a pre-trained model.")
+            return
+    
     game = TicTacToe()
-    mcts = MCTS(net)
+    mcts = MCTS(game_class=TicTacToe, policy_value_net=net)
 
     print("You are playing as X (1). Type moves like: 3 4")
 
@@ -32,6 +45,9 @@ def human_vs_ai(model_path="models/best_3x3.pt"):
 
         if game.current_player == 1:
             move = input("Your move (row col): ")
+
+            # TODO: sanitize input
+
             row, col = map(int, move.strip().split())
             if (row, col) not in game.get_legal_actions():
                 print("Illegal move, try again.")

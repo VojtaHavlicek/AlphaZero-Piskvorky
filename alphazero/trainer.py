@@ -52,9 +52,6 @@ class NeuralNetworkTrainer:
                 policy = policy.to(self.device, dtype=torch.float32)
                 value = value.to(self.device, dtype=torch.float32).view(-1, 1)
 
-                # Make sure model is still on correct device
-                self.net = self.net.to(self.device).to(torch.float32)
-
                 pred_policy, pred_value = self.net(state)
 
                 log_probs = F.log_softmax(pred_policy, dim=1)
@@ -76,6 +73,10 @@ class NeuralNetworkTrainer:
                 "policy": total_policy_loss,
                 "value": total_value_loss
             })
+
+            if (epoch + 1) % 5 == 0:
+                print(f"Epoch {epoch+1}: Total={total_loss:.4f}, Policy={total_policy_loss:.4f}, Value={total_value_loss:.4f}")
+
 
         print(f"[Trainer] Training finished. Loss: {total_loss:.4f}, Policy Loss: {total_policy_loss:.4f}, Value Loss: {total_value_loss:.4f}")
 

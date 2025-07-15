@@ -3,6 +3,7 @@ from tqdm import tqdm, trange
 from monte_carlo_tree_search import MCTS  # Assuming MCTS is defined in mcts.py
 
 class ModelEvaluator:
+    # TODO: implement parallel evaluation
     def __init__(self, game_class, mcts_class=None, mcts_params=None, print_games =False):
         self.game_class = game_class
         self.mcts_class = mcts_class if mcts_class is not None else MCTS
@@ -20,8 +21,8 @@ class ModelEvaluator:
 
         for i in tqdm(range(num_games), desc="[Evaluator] Evaluating", ncols=80):
             game = self.game_class()
-            mcts1 = self.mcts_class(candidate_net, **self.mcts_params)
-            mcts2 = self.mcts_class(baseline_net, **self.mcts_params)
+            mcts1 = self.mcts_class(self.game_class, candidate_net, **self.mcts_params)
+            mcts2 = self.mcts_class(self.game_class, baseline_net, **self.mcts_params)
 
             player_order = (mcts1, mcts2) if i % 2 == 0 else (mcts2, mcts1)
             game.current_player = 1
