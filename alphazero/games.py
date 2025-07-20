@@ -10,13 +10,12 @@ License: MIT
 
 # Note: Multiplayer games? 
 import torch
-import torch.nn as nn
 import numpy as np
 
 # --- Abstract Game Class ---
 class Game:
     def __init__(self, board_size):
-        self.size = board_size 
+        self.board_size = board_size 
         self.board = [[0] * board_size for _ in range(board_size)]
         self.current_player = 1
 
@@ -33,25 +32,29 @@ class Game:
         pass
     def clone(self) -> 'Game':
         """Return a deep copy of the game state."""
-        new_game = Game(self.size)
+        new_game = Game(self.board_size)
         new_game.board = [row[:] for row in self.board]
         new_game.current_player = self.current_player
         return new_game
 
 
+
 # --- Gomoku ---
 class Gomoku(Game):
-    def __init__(self, board_size=8, win_length=5):
+    def __init__(self, board_size=5, win_length=4):
         super().__init__(board_size)
         self._winner = None
         self.win_length = win_length
 
     def get_legal_actions(self) -> list:
         """Return a list of legal actions for the current player."""
-        return [(r, c) for r in range(self.size) for c in range(self.size) if self.board[r][c] == 0]
+        return [(r, c) for r in range(self.board_size) for c in range(self.board_size) if self.board[r][c] == 0]
     
     def apply_action(self, action) -> 'Gomoku':
-        """Apply an action to the game state."""
+        """
+        Applies an action to the game state and switches the current player.
+        Returns a new game state with the action applied.
+        """
         r, c = action
         if self.board[r][c] != 0:
             raise ValueError("Invalid move")
@@ -61,45 +64,28 @@ class Gomoku(Game):
         return new_game
     
     def _check_line(self, r, c, dr, dc, player) -> bool:
-        """Check if there is a winning line starting from (r, c) in direction (dr, dc)."""
+        """
+        Check if there is a winning line for player starting from (r, c) in direction (dr, dc).
+        """
         count = 0
         for i in range(self.win_length):
             nr, nc = r + i * dr, c + i * dc
-            if 0 <= nr < self.size and 0 <= nc < self.size and self.board[nr][nc] == player:
+            if 0 <= nr < self.board_size and 0 <= nc < self.board_size and self.board[nr][nc] == player:
                 count += 1
             else:
                 break
         return count == self.win_length
-    
-
-    # TODO: Later! 
-    #def symmetries(self, policy:torch.Tensor) -> list:
-    #    """
-    #    Generate symmetries of the game state and policy.
-        
-    #    Returns a list of tuples (symmetry, policy) where symmetry is the transformed game state.
-    #    """
-    #    symmetries = []
-    #    for flip in [False, True]:
-    #        for rotate in range(4):
-    #            new_game = self.clone()
-    #            if flip:
-    #                new_game.board = [row[::-1] for row in new_game.board]
-    #            if rotate > 0:
-    #                new_game.board = [list(row) for row in zip(*new_game.board[::-1])]
-    #            new_policy = policy.clone()
-    #            symmetries.append((new_game, new_policy))
-    #    return symmetries
-    
    
     def is_terminal(self) -> bool:
-        """Check if the game is in a terminal state."""
+        """
+        Check if the game is in a terminal state.
+        """
         if self._winner is not None:
             return True
 
         # Check for a winner
-        for r in range(self.size):
-            for c in range(self.size):
+        for r in range(self.board_size):
+            for c in range(self.board_size):
                 if self.board[r][c] == 0:
                     continue
                 player = self.board[r][c]
@@ -111,7 +97,7 @@ class Gomoku(Game):
                     self._winner = player
                     return True
         # Check for a draw
-        if all(self.board[r][c] != 0 for r in range(self.size) for c in range(self.size)):
+        if all(self.board[r][c] != 0 for r in range(self.board_size) for c in range(self.board_size)):
             self._winner = 0
             return True
         return False
@@ -133,23 +119,26 @@ class Gomoku(Game):
 
         MARK: Used in AlphaZero's neural network input! 
         """
-        encoded = torch.zeros((3, self.size, self.size), dtype=torch.float32, device=device)
-        for r in range(self.size):
-            for c in range(self.size):
+        encoded = torch.zeros((3, self.board_size, self.board_size), dtype=torch.float32, device=device)
+        for r in range(self.board_size):
+            for c in range(self.board_size):
                 if self.board[r][c] == 1:
                     encoded[0, r, c] = 1.0
                 elif self.board[r][c] == -1:
                     encoded[1, r, c] = 1.0
                 else:
                     encoded[2, r, c] = 1.0
-        return encoded.view(1, 3, self.size, self.size) # PyTorch expects [1, C, H, W] format for CNNs
+        return encoded.view(1, 3, self.board_size, self.board_size) # PyTorch expects [1, C, H, W] format for CNNs
     
     
     def clone(self) -> 'Gomoku':
-        """Return a deep copy of the game state."""
-        new_game = Gomoku(self.size, self.win_length)
+        """
+        Return a deep copy of the game state.
+        """
+        new_game = Gomoku(self.board_size, self.win_length)
         new_game.board = [row[:] for row in self.board]
         new_game.current_player = self.current_player
+        new_game._winner = self._winner
         return new_game
     
 
@@ -161,13 +150,20 @@ class Gomoku(Game):
             str: A string representation of the Gomoku board.
         """
         board_str = "\n".join(
-            " | ".join("X" if self.board[i][j] == 1 else "O" if self.board[i][j] != 0 else " " for j in range(self.size))
-            for i in range(self.size)
+            " | ".join("X" if self.board[i][j] == 1 else "O" if self.board[i][j] != 0 else " " for j in range(self.board_size))
+            for i in range(self.board_size)
         )
         return f"Gomoku(\n{board_str}\n)"
     
+    
 # --- TicTacToe ---
 class TicTacToe(Game):
+    """
+    TicTacToe game implementation. Surprisingly not a great fit for AlphaZero!  
+
+    Args:
+        Game (_type_): _description_
+    """
     def __init__(self):
         super().__init__(board_size=3)
         self._winner = None

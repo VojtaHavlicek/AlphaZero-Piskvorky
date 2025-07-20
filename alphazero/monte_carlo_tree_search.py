@@ -196,7 +196,7 @@ class MCTS:
             policy (list): _description_
         """
         for action in node.game_state.get_legal_actions():
-            idx = action[0] * node.game_state.size + action[1]
+            idx = action[0] * node.game_state.board_size + action[1]
             node.children[action] = Node(
                 game_state=node.game_state.apply_action(action),
                 parent=node,
@@ -236,8 +236,8 @@ class MCTS:
 
         if temperature == 0 or visits.sum() == 0:
             best = actions[visits.argmax().item()]
-            policy = torch.zeros(root.game_state.size**2, dtype=torch.float32, device=self.device)
-            idx = best[0] * root.game_state.size + best[1]
+            policy = torch.zeros(root.game_state.board_size**2, dtype=torch.float32, device=self.device)
+            idx = best[0] * root.game_state.board_size + best[1]
             policy[idx] = 1.0
             return policy.cpu(), best
 
@@ -247,9 +247,9 @@ class MCTS:
         probs = torch.clamp(probs, min=0)
         probs = probs / probs.sum() if probs.sum() > 0 else torch.ones_like(probs) / len(probs)
 
-        policy = torch.zeros(root.game_state.size**2, dtype=torch.float32, device=self.device)
+        policy = torch.zeros(root.game_state.board_size**2, dtype=torch.float32, device=self.device)
         for a, p in zip(actions, probs):
-            idx = a[0] * root.game_state.size + a[1]
+            idx = a[0] * root.game_state.board_size + a[1]
             policy[idx] = p.item()
 
         action = actions[torch.multinomial(probs, 1).item()]
