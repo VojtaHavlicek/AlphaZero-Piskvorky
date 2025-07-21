@@ -14,12 +14,7 @@ import torch
 
 
 class ModelPromoter:
-    def __init__(self, 
-                 model_dir, 
-                 evaluator, 
-                 net_class, 
-                 threshold=0.55, 
-                 device="cpu"):
+    def __init__(self, model_dir, evaluator, net_class, threshold=0.55, device="cpu"):
         self.model_dir = model_dir
         self.evaluator = evaluator
         self.net_class = net_class  # To reinstantiate best model
@@ -35,16 +30,22 @@ class ModelPromoter:
         model.load_state_dict(torch.load(self.best_path, map_location=self.device))
         return model
 
-    def evaluate_and_maybe_promote(self, candidate_net, num_games=20, metadata=None, debug=False):
+    def evaluate_and_maybe_promote(
+        self, candidate_net, num_games=20, metadata=None, debug=False
+    ):
         base_net = self.get_best_model()
-        win_rate, metrics = self.evaluator.evaluate(candidate_net, base_net, num_games=num_games, debug=debug)
+        win_rate, metrics = self.evaluator.evaluate(
+            candidate_net, base_net, num_games=num_games, debug=debug
+        )
 
         if win_rate > self.threshold:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             model_path = os.path.join(self.model_dir, f"model_{timestamp}.pt")
             torch.save(candidate_net.state_dict(), model_path)
             self.best_path = model_path
-            print(f"[Promoter]: ✅ Promoted new model with win rate {win_rate:.2%} → {model_path}")
+            print(
+                f"[Promoter]: ✅ Promoted new model with win rate {win_rate:.2%} → {model_path}"
+            )
             if metadata:
                 print("Metadata:", metadata)
         else:
@@ -56,5 +57,7 @@ class ModelPromoter:
         models = [f for f in os.listdir(self.model_dir) if f.endswith(".pt")]
         if not models:
             return None
-        latest = max(models, key=lambda f: os.path.getctime(os.path.join(self.model_dir, f)))
+        latest = max(
+            models, key=lambda f: os.path.getctime(os.path.join(self.model_dir, f))
+        )
         return os.path.join(self.model_dir, latest)

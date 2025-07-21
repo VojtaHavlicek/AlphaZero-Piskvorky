@@ -5,7 +5,9 @@ from tqdm import tqdm
 
 class ModelEvaluator:
     # TODO: implement parallel evaluation
-    def __init__(self, game_class, mcts_class=None, mcts_params=None, print_games =False):
+    def __init__(
+        self, game_class, mcts_class=None, mcts_params=None, print_games=False
+    ):
         self.game_class = game_class
         self.mcts_class = mcts_class if mcts_class is not None else MCTS
         self.mcts_params = mcts_params or {}
@@ -27,7 +29,6 @@ class ModelEvaluator:
 
             game.current_player = 1
             player_order = (mcts1, mcts2) if i % 2 == 0 else (mcts2, mcts1)
-            
 
             move_sequence = []
 
@@ -45,7 +46,9 @@ class ModelEvaluator:
                 policy, action = mcts.run(game, temperature=0)
 
                 if debug:
-                    print(f"[Debug] Player {game.current_player} selects action: {action}")
+                    print(
+                        f"[Debug] Player {game.current_player} selects action: {action}"
+                    )
                     print(f"[Debug] Policy: {policy.cpu().numpy().round(3)}")
                     print(f"[Debug] State after action {action}:\n{game}\n------")
 
@@ -72,12 +75,16 @@ class ModelEvaluator:
                 draws += 1
 
         total = candidate_wins + baseline_wins
-        win_rate = candidate_wins / total if total > 0 else 0.5 # Default to 50% if no games were played
-        print(f"[Evaluator]: Candidate Win Rate: {win_rate:.2%} (W:{candidate_wins} L:{baseline_wins} D:{draws})")
+        win_rate = (
+            candidate_wins / total if total > 0 else 0.5
+        )  # Default to 50% if no games were played
+        print(
+            f"[Evaluator]: Candidate Win Rate: {win_rate:.2%} (W:{candidate_wins} L:{baseline_wins} D:{draws})"
+        )
         return win_rate, {
             "wins": candidate_wins,
             "losses": baseline_wins,
             "draws": draws,
             "total": total,
-            "win_rate": win_rate
+            "win_rate": win_rate,
         }

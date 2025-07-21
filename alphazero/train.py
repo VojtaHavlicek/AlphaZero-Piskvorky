@@ -18,9 +18,9 @@ from replay_buffer import ReplayBuffer
 from self_play import SelfPlayManager
 from trainer import NeuralNetworkTrainer, generate_minimax_vs_random_dataset, minimax
 
-# Ultimate TicTacToe implementation: 
-# Uses BATCH_SIZE = 2048, 
-# KL_DIVERGENCE loss, 
+# Ultimate TicTacToe implementation:
+# Uses BATCH_SIZE = 2048,
+# KL_DIVERGENCE loss,
 # LR_SCHEDULE = lr_schedule={
 #            0: 5e-5,
 #            1000: 1e-4,
@@ -33,16 +33,16 @@ from trainer import NeuralNetworkTrainer, generate_minimax_vs_random_dataset, mi
 #            95000: 0.02,
 #        },
 
-# https://github.com/arnowaczynski/utttai/blob/main/scripts/train_stage1.py 
+# https://github.com/arnowaczynski/utttai/blob/main/scripts/train_stage1.py
 
 
 # --- Parameters ---
 BOARD_SIZE = 5
 WIN_LENGTH = 4
 NUM_EPISODES = 10
-NUM_SELF_PLAY_GAMES = 150 # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
+NUM_SELF_PLAY_GAMES = 150  # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
 BATCH_SIZE = 128
-NUM_EPOCHS = 10 
+NUM_EPOCHS = 10
 EVALUATION_GAMES = 50
 BUFFER_CAPACITY = 1_000
 BOOTSTRAP = False
@@ -50,21 +50,24 @@ MODEL_DIR = "models"
 
 
 if __name__ == "__main__":
-
     # Set up multiprocessing for MPS backend
     import torch.multiprocessing as mp
+
     mp.set_start_method("spawn", force=True)
-    device = "cpu" #torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    device = (
+        "cpu"  # torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    )
 
     # Initialize network, promoter, and replay buffer
     net = GomokuNet(board_size=BOARD_SIZE).to(device)
-    self_play_manager = SelfPlayManager(net, Gomoku)  
+    self_play_manager = SelfPlayManager(net, Gomoku)
     buffer = ReplayBuffer(capacity=BUFFER_CAPACITY)
     evaluator = ModelEvaluator(Gomoku)
-    promoter = ModelPromoter(model_dir=MODEL_DIR, evaluator=evaluator, net_class=GomokuNet)
+    promoter = ModelPromoter(
+        model_dir=MODEL_DIR, evaluator=evaluator, net_class=GomokuNet
+    )
     trainer = NeuralNetworkTrainer(net, device=device)
-    
-    
+
     # TODO: Make sure not to contaminate the model directory with old models.
     # Optional: only do this if model has not trained before
     if BOOTSTRAP:
@@ -72,22 +75,22 @@ if __name__ == "__main__":
         bootstrap_data = generate_minimax_vs_random_dataset(
             game_class=Gomoku,
             minimax_agent=minimax,
-            num_games=BATCH_SIZE//4, 
+            num_games=BATCH_SIZE // 4,
             max_depth=9,
         )
         buffer.add(bootstrap_data)
-
 
     # Go through the training loop
     for episode in range(1, NUM_EPISODES + 1):
         print(f"EPISODE: {episode} \n---------------------------")
 
         # ---- Self-play games ----
-        data = self_play_manager.generate_self_play(num_games=NUM_SELF_PLAY_GAMES,
-                                                    num_workers=4)
-        
+        data = self_play_manager.generate_self_play(
+            num_games=NUM_SELF_PLAY_GAMES, num_workers=4
+        )
+
         print(f"[Buffer]: size: {len(buffer)}")
-        buffer.add(data) # Add data to the replay buffer
+        buffer.add(data)  # Add data to the replay buffer
         print(f"[Buffer]: samples added, current size: {len(buffer)}")
 
         # ---- Train ----
@@ -95,8 +98,10 @@ if __name__ == "__main__":
         examples = buffer.sample_batch(BATCH_SIZE)
         trainer.train(examples, epochs=NUM_EPOCHS)
         print("[Trainer] Training complete.")
-        print("[Debug] Candidate policy logits (first 5):", net(torch.zeros(1, 3, 3, 3).to(device))[0][0][:5].detach().cpu().numpy())
-
+        print(
+            "[Debug] Candidate policy logits (first 5):",
+            net(torch.zeros(1, 3, 3, 3).to(device))[0][0][:5].detach().cpu().numpy(),
+        )
 
         # ---- Evaluate and promote if better ----
         best_net = promoter.get_best_model()
@@ -104,10 +109,11 @@ if __name__ == "__main__":
         #     print("⚠️ Candidate model is identical to the baseline.")
         # else:
         #     print("✅ Models differ — evaluation makes sense.")
-        win_rate, metrics = promoter.evaluate_and_maybe_promote(net, num_games=EVALUATION_GAMES, metadata={"episode": episode}, debug=True)
+        win_rate, metrics = promoter.evaluate_and_maybe_promote(
+            net, num_games=EVALUATION_GAMES, metadata={"episode": episode}, debug=True
+        )
 
         print()
         print("----- Evaluation complete -----")
         # Optional: Print summary
         print(f"[Summary] Win rate: {win_rate:.2%} | Metrics: {metrics}")
-

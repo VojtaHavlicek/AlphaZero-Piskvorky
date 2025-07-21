@@ -7,12 +7,11 @@ Description: Self-play implementation for AlphaZero algorithm.
 License: MIT
 """
 
-
 import torch
 from monte_carlo_tree_search import MCTS
 from tqdm import tqdm
 
- # --- Parameters ---
+# --- Parameters ---
 NUM_EPISODES = 100
 NUM_SELF_PLAY_GAMES = 100
 BATCH_SIZE = 64
@@ -31,9 +30,10 @@ def default_temperature_schedule(move: int) -> float:
     if move < 6:
         # Mid game, moderate temperature
         return 0.1
-    
+
     # Late game, low temperature
     return 0.01
+
 
 class SelfPlayManager:
     def __init__(
@@ -49,18 +49,14 @@ class SelfPlayManager:
         self.mcts_params = mcts_params or {"num_simulations": 200}
         self.temperature_schedule = temperature_schedule
 
-
-    def _worker(self, task_queue: 'mp.Queue', result_queue: 'mp.Queue', state_dict):
-
+    def _worker(self, task_queue: "mp.Queue", result_queue: "mp.Queue", state_dict):
         torch.set_num_threads(1)
 
         policy_value_net = self.net_class()
         policy_value_net.load_state_dict(state_dict)
         policy_value_net.eval()
 
-        mcts = MCTS(
-            game_class=self.game_class,
-            net=policy_value_net)
+        mcts = MCTS(game_class=self.game_class, net=policy_value_net)
 
         while True:
             try:
@@ -68,50 +64,52 @@ class SelfPlayManager:
             except Empty:
                 break
 
-            try: 
+            try:
                 game_state = self.game_class()
                 history = []
                 move_num = 0
 
                 while not game_state.is_terminal():
                     temp = self.temperature_schedule(move_num)
-                    #print(f"[Worker {task_id}] Starting move {move_num} with temperature {temp:.2f}")
-                    policy, action = mcts.run(game_state=game_state, 
-                                              temperature=temp, 
-                                              add_exploration_noise=True)
-                    
-                    
-                    #print(f"[Worker {task_id}] Policy: {policy.cpu().numpy().round(3)}")
+                    # print(f"[Worker {task_id}] Starting move {move_num} with temperature {temp:.2f}")
+                    policy, action = mcts.run(
+                        game_state=game_state,
+                        temperature=temp,
+                        add_exploration_noise=True,
+                    )
+
+                    # print(f"[Worker {task_id}] Policy: {policy.cpu().numpy().round(3)}")
                     state = game_state.encode().squeeze(0)
                     history.append((state, policy, game_state.current_player))
                     game_state = game_state.apply_action(action)
                     move_num += 1
-                    #print(f"[Worker {task_id}] Move {move_num}: Player {game.current_player}, Action: {action}, Temp: {temp:.2f} \n{game}")
-                #print(f"[Worker {task_id}] Game finished after {move_num} moves.")
+                    # print(f"[Worker {task_id}] Move {move_num}: Player {game.current_player}, Action: {action}, Temp: {temp:.2f} \n{game}")
+                # print(f"[Worker {task_id}] Game finished after {move_num} moves.")
                 winner = game_state.get_winner()
-                state = game_state.encode().squeeze(0)  
+                state = game_state.encode().squeeze(0)
 
-                # Check if the encoding works: 
+                # Check if the encoding works:
                 data = [
-                    (state, policy, 1.0 if winner == p else -1.0 if winner == -p else 0.0)
+                    (
+                        state,
+                        policy,
+                        1.0 if winner == p else -1.0 if winner == -p else 0.0,
+                    )
                     for state, policy, p in history
-                ] # This is the full selfplay history. 
+                ]  # This is the full selfplay history.
 
                 # print(f"Data: \n {data} \n -----------------")
                 result_queue.put(data)
-               
 
             except Exception as e:
                 print(f"[Worker {task_id}] Error:", e)
                 break
 
-        # Terminated 
+        # Terminated
 
-
-    def generate_self_play(self, 
-                           num_games: int, 
-                           num_workers: int = None, 
-                           flatten=True) -> list:
+    def generate_self_play(
+        self, num_games: int, num_workers: int = None, flatten=True
+    ) -> list:
         """
         Generate self-play games using multiple workers.
 
@@ -141,10 +139,14 @@ class SelfPlayManager:
         for w in workers:
             w.start()
 
-        print(f"[SelfPlayManager] Collecting {num_games} games with {num_workers} workers...")
+        print(
+            f"[SelfPlayManager] Collecting {num_games} games with {num_workers} workers..."
+        )
 
         results = []
-        with tqdm(total=num_games, desc="[SelfPlayManager] Self-play", ncols=80) as pbar:
+        with tqdm(
+            total=num_games, desc="[SelfPlayManager] Self-play", ncols=80
+        ) as pbar:
             for _ in range(num_games):
                 try:
                     data = result_queue.get(timeout=60)
@@ -159,9 +161,8 @@ class SelfPlayManager:
 
         print(f"[SelfPlayManager] Collected {len(results)} games.")
 
-        # NOTE: Important - 
-        # Flatten the results so this is plug an 
+        # NOTE: Important -
+        # Flatten the results so this is plug an
         if flatten:
             return [sample for game in results for sample in game]
         return results
-       

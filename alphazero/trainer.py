@@ -18,14 +18,22 @@ class AlphaZeroDataset(Dataset):
         return (
             state.float(),
             policy.float(),
-            torch.tensor(value, dtype=torch.float32) if not torch.is_tensor(value) else value.float()
+            torch.tensor(value, dtype=torch.float32)
+            if not torch.is_tensor(value)
+            else value.float(),
         )
 
 
 class NeuralNetworkTrainer:
     def __init__(self, net, lr=1e-3, batch_size=64, device=None):
         if device is None:
-            device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
+            device = torch.device(
+                "mps"
+                if torch.backends.mps.is_available()
+                else "cuda"
+                if torch.cuda.is_available()
+                else "cpu"
+            )
         self.device = device
 
         self.net = net.to(self.device).to(torch.float32)
@@ -71,17 +79,22 @@ class NeuralNetworkTrainer:
                 total_value_loss += loss_value.item()
 
             # print(f"[Trainer] Epoch {epoch + 1}/{epochs} - Loss: {total_loss:.4f}, Policy Loss: {total_policy_loss:.4f}, Value Loss: {total_value_loss:.4f}")
-            self.training_history.append({
-                "loss": total_loss,
-                "policy": total_policy_loss,
-                "value": total_value_loss
-            })
+            self.training_history.append(
+                {
+                    "loss": total_loss,
+                    "policy": total_policy_loss,
+                    "value": total_value_loss,
+                }
+            )
 
             if (epoch + 1) % 5 == 0:
-                print(f"Epoch {epoch+1}: Total={total_loss:.4f}, Policy={total_policy_loss:.4f}, Value={total_value_loss:.4f}")
+                print(
+                    f"Epoch {epoch + 1}: Total={total_loss:.4f}, Policy={total_policy_loss:.4f}, Value={total_value_loss:.4f}"
+                )
 
-
-        print(f"[Trainer] Training finished. Loss: {total_loss:.4f}, Policy Loss: {total_policy_loss:.4f}, Value Loss: {total_value_loss:.4f}")
+        print(
+            f"[Trainer] Training finished. Loss: {total_loss:.4f}, Policy Loss: {total_policy_loss:.4f}, Value Loss: {total_value_loss:.4f}"
+        )
 
     def save(self, path):
         torch.save(self.net.state_dict(), path)
@@ -95,8 +108,6 @@ class NeuralNetworkTrainer:
 
     def train_mode(self):
         self.net.train()
-
-
 
 
 def generate_minimax_vs_random_dataset(
@@ -136,7 +147,12 @@ def generate_minimax_vs_random_dataset(
 
             # Choose action
             if current_player == minimax_player:
-                _, action = minimax_agent(game, depth=max_depth, maximizing_player=True, root_player=current_player)
+                _, action = minimax_agent(
+                    game,
+                    depth=max_depth,
+                    maximizing_player=True,
+                    root_player=current_player,
+                )
             else:
                 legal_actions = game.get_legal_actions()
                 action = random.choice(legal_actions) if legal_actions else None
@@ -155,7 +171,11 @@ def generate_minimax_vs_random_dataset(
         # Assign outcome value to each move in game history
         winner = game.get_winner()
         labeled_history = [
-            (state, policy, 1.0 if winner == player else -1.0 if winner == -player else 0.0)
+            (
+                state,
+                policy,
+                1.0 if winner == player else -1.0 if winner == -player else 0.0,
+            )
             for state, policy, player in game_history
         ]
         all_games.append(labeled_history)
@@ -173,7 +193,7 @@ def minimax(game, depth, maximizing_player, root_player):
         else:
             return 0, None
 
-    best_value = float('-inf') if maximizing_player else float('inf')
+    best_value = float("-inf") if maximizing_player else float("inf")
     best_actions = []
 
     for action in game.get_legal_actions():
@@ -195,7 +215,3 @@ def minimax(game, depth, maximizing_player, root_player):
 
     best_action = random.choice(best_actions) if best_actions else None
     return best_value, best_action
-
-
-
-

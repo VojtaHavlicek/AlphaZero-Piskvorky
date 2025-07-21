@@ -7,7 +7,6 @@ Description: Buffer to store training examples from self-play games.
 License: MIT
 """
 
-
 import random
 from collections import deque
 
@@ -22,7 +21,7 @@ class ReplayBuffer:
         FIFO behavior is maintained by using a deque with a maximum length.
 
         Examples should be in the format:
-        
+
 
         Args:
             game_examples (list): List of game examples to add.
@@ -33,7 +32,7 @@ class ReplayBuffer:
         """
         Sample a batch of training examples from the buffer.
 
-        TODO: should return states/policies/values separately? 
+        TODO: should return states/policies/values separately?
         """
         if len(self.buffer) < batch_size:
             return self.buffer  # Return all if not enough samples
@@ -50,4 +49,3 @@ class ReplayBuffer:
 
     def __len__(self) -> int:
         return len(self.buffer)
-    

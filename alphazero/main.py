@@ -15,9 +15,7 @@ from trainer import minimax
 
 
 # "models/best_3x3.pt"
-def human_vs_ai(model_path=None,
-                model=None):
-    
+def human_vs_ai(model_path=None, model=None):
     if model is not None:
         net = model
     elif model_path is not None:
@@ -30,9 +28,11 @@ def human_vs_ai(model_path=None,
             net.load_state_dict(torch.load("models/best_3x3.pt", map_location="cpu"))
             net.eval()
         except FileNotFoundError:
-            print("No model found. Please provide a valid model path or load a pre-trained model.")
+            print(
+                "No model found. Please provide a valid model path or load a pre-trained model."
+            )
             return
-    
+
     game = TicTacToe()
     mcts = MCTS(game_class=TicTacToe, net=net)
 
@@ -68,7 +68,6 @@ def human_vs_ai(model_path=None,
 
 
 def human_vs_minimax(game_class=TicTacToe, minimax_agent=minimax, depth=9):
-
     game = game_class()
     print("Welcome! You're playing as X (1). Minimax is O (-1).")
     print(game)
@@ -88,7 +87,9 @@ def human_vs_minimax(game_class=TicTacToe, minimax_agent=minimax, depth=9):
                 continue
         else:
             # Minimax turn
-            _, action = minimax_agent(game, depth, maximizing_player=True, root_player=game.current_player)
+            _, action = minimax_agent(
+                game, depth, maximizing_player=True, root_player=game.current_player
+            )
             print(f"\n🤖 Minimax plays: {action}")
 
         game = game.apply_action(action)
@@ -117,6 +118,6 @@ def print_board(game):
         print(row)
     print()
 
+
 if __name__ == "__main__":
     human_vs_minimax()
-

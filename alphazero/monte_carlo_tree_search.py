@@ -6,6 +6,7 @@ Created: 2025-07-11
 Description: Monte Carlo Tree Search (MCTS) implementation for the AlphaZero algorithm.
 License: MIT
 """
+
 import random
 
 import numpy as np
@@ -17,19 +18,17 @@ DEFAULT_CACHE_SIZE = 100_000  # Default size for the evaluation cache
 DEFAULT_NUM_SIMULATIONS = 250  # Default number of simulations per move
 DEFAULT_EXPLORATION_STRENGTH = 1.4  # Default exploration strength for UCB
 
+
 class Node:
     """
     Represents a node in the MCTS tree.
     """
-    def __init__(self, 
-                 game_state: Game, 
-                 parent=None, 
-                 policy_prior=1.0):
-        
+
+    def __init__(self, game_state: Game, parent=None, policy_prior=1.0):
         self.game_state = game_state
         self.parent = parent
-        self.policy_prior = policy_prior # NOTE: This is the prior probability of choosing this node in the UCB formula 
-        self.children = {} # Dictionary of child nodes, key is action tuple (row, col)
+        self.policy_prior = policy_prior  # NOTE: This is the prior probability of choosing this node in the UCB formula
+        self.children = {}  # Dictionary of child nodes, key is action tuple (row, col)
 
         self.N = 0  # Visit count
         self.W = 0.0  # Total value
@@ -40,27 +39,31 @@ class Node:
 
 
 class MCTS:
-    def __init__(self, 
-                 game_class: type[Game],
-                 net: torch.nn.Module, 
-                 exploration_strength=DEFAULT_EXPLORATION_STRENGTH, 
-                 num_simulations=DEFAULT_NUM_SIMULATIONS, 
-                 cache_size=DEFAULT_CACHE_SIZE):
-        
-        self.game_class = game_class             # Type of the game, e.g., TicTacToe
-        self.net = net # Neural network for policy and value estimation
-        self.exploration_strength = exploration_strength # Strength of exploration in UCB formula
-        self.num_simulations = num_simulations   # Number of simulations to run per move
-        self.cache_size = cache_size             # Maximum size of the evaluation cache
+    def __init__(
+        self,
+        game_class: type[Game],
+        net: torch.nn.Module,
+        exploration_strength=DEFAULT_EXPLORATION_STRENGTH,
+        num_simulations=DEFAULT_NUM_SIMULATIONS,
+        cache_size=DEFAULT_CACHE_SIZE,
+    ):
+        self.game_class = game_class  # Type of the game, e.g., TicTacToe
+        self.net = net  # Neural network for policy and value estimation
+        self.exploration_strength = (
+            exploration_strength  # Strength of exploration in UCB formula
+        )
+        self.num_simulations = num_simulations  # Number of simulations to run per move
+        self.cache_size = cache_size  # Maximum size of the evaluation cache
 
-        self.device = next(net.parameters()).device # NOTE: do I need this? 
+        self.device = next(net.parameters()).device  # NOTE: do I need this?
         self.evaluation_cache = self._init_cache()
 
-
-    def run(self, 
-            game_state: Game, 
-            temperature: float = 1.0, 
-            add_exploration_noise: bool = False):
+    def run(
+        self,
+        game_state: Game,
+        temperature: float = 1.0,
+        add_exploration_noise: bool = False,
+    ):
         """
         Runs the MCTS from a given game state.
 
@@ -72,7 +75,7 @@ class MCTS:
         Returns:
             _type_: _description_
         """
-        
+
         # --- Initialize root ---
         root = Node(game_state=game_state)
         root_player = game_state.current_player
@@ -99,7 +102,6 @@ class MCTS:
         # --- Return policy ---
         return self._get_policy(root, temperature)
 
-
     def _select_and_expand(self, root: Node):
         """
         Selects a path from the root node to a leaf node, expanding nodes along the way.
@@ -116,7 +118,6 @@ class MCTS:
             node = self._select_child(node)
             path.append(node)
         return path
-
 
     def _evaluate_terminal(self, game_state: Game, root_player: int) -> float:
         """
@@ -142,7 +143,6 @@ class MCTS:
         else:
             raise ValueError(f"Unexpected winner value: {winner}")
 
-
     def _evaluate_and_backpropagate(self, pending):
         """
         Evaluates the game states in the pending list using the policy-value network.
@@ -161,7 +161,9 @@ class MCTS:
                 self._expand(node, policy_tensor.numpy())
                 self._backpropagate(path, value)
             else:
-                states.append(node.game_state.encode(device=self.device).to(dtype=torch.float32))
+                states.append(
+                    node.game_state.encode(device=self.device).to(dtype=torch.float32)
+                )
                 keys.append(key)
                 paths.append((node, path))
 
@@ -183,7 +185,6 @@ class MCTS:
             if len(self.evaluation_cache) > self.cache_size:
                 self.evaluation_cache.popitem(last=False)
 
-
     def _expand(self, node: Node, policy: list):
         """
         Expands the node by creating child nodes for each legal action.
@@ -199,9 +200,8 @@ class MCTS:
             node.children[action] = Node(
                 game_state=node.game_state.apply_action(action),
                 parent=node,
-                policy_prior=policy[idx]
+                policy_prior=policy[idx],
             )
-
 
     def _backpropagate(self, path: list, value: float):
         """
@@ -218,7 +218,6 @@ class MCTS:
             node.Q = node.W / node.N
             value = -value  # Switch perspective
 
-
     def _get_policy(self, root: Node, temperature: float):
         """
         Returns the policy distribution over actions from the root node.
@@ -230,45 +229,61 @@ class MCTS:
         Returns:
             tuple: A tuple containing the policy distribution tensor and the selected action.
         """
-        visits = torch.tensor([c.N for c in root.children.values()], device=self.device, dtype=torch.float32)
+        visits = torch.tensor(
+            [c.N for c in root.children.values()],
+            device=self.device,
+            dtype=torch.float32,
+        )
         actions = list(root.children.keys())
 
         if temperature == 0 or visits.sum() == 0:
             best = actions[visits.argmax().item()]
-            policy = torch.zeros(root.game_state.board_size**2, dtype=torch.float32, device=self.device)
+            policy = torch.zeros(
+                root.game_state.board_size**2, dtype=torch.float32, device=self.device
+            )
             idx = best[0] * root.game_state.board_size + best[1]
             policy[idx] = 1.0
             return policy.cpu(), best
 
         counts = visits ** (1.0 / temperature)
-        probs = counts / counts.sum() if counts.sum() > 0 else torch.ones_like(counts) / len(counts)
+        probs = (
+            counts / counts.sum()
+            if counts.sum() > 0
+            else torch.ones_like(counts) / len(counts)
+        )
         probs = torch.nan_to_num(probs, nan=0.0, posinf=0.0, neginf=0.0)
         probs = torch.clamp(probs, min=0)
-        probs = probs / probs.sum() if probs.sum() > 0 else torch.ones_like(probs) / len(probs)
+        probs = (
+            probs / probs.sum()
+            if probs.sum() > 0
+            else torch.ones_like(probs) / len(probs)
+        )
 
-        policy = torch.zeros(root.game_state.board_size**2, dtype=torch.float32, device=self.device)
+        policy = torch.zeros(
+            root.game_state.board_size**2, dtype=torch.float32, device=self.device
+        )
         for a, p in zip(actions, probs, strict=False):
             idx = a[0] * root.game_state.board_size + a[1]
             policy[idx] = p.item()
 
         action = actions[torch.multinomial(probs, 1).item()]
         return policy.cpu(), action
-    
 
     def _ucb_score(self, node: Node, child: Node) -> float:
         """
         Computes the Upper Confidence Bound (UCB) score for a child node.
         This score balances exploration and exploitation.
-        
-        Args: 
+
+        Args:
             node (Node): The parent node.
             child (Node): The child node to evaluate.
-        
+
         Returns:
             float: The UCB score for the child node.
-        """  
-        return child.Q + self.exploration_strength * child.policy_prior * (node.N ** 0.5) / (1 + child.N)
-    
+        """
+        return child.Q + self.exploration_strength * child.policy_prior * (
+            node.N**0.5
+        ) / (1 + child.N)
 
     def _select_child(self, node: Node) -> Node:
         """
@@ -276,7 +291,7 @@ class MCTS:
 
         Args:
             node (Node): The parent node from which to select a child.
-        
+
         Returns:
             Node: The selected child node.
         """
@@ -293,7 +308,6 @@ class MCTS:
         action, node = list(node.children.items())[chosen_index]
 
         return node  # Return the selected child node
-    
 
     def _expand_root(self, root: Node):
         """
@@ -316,19 +330,20 @@ class MCTS:
                 probs = torch.softmax(logits, dim=1).squeeze(0)
                 probs = torch.nan_to_num(probs, nan=0.0, posinf=0.0, neginf=0.0)
                 entropy = -(probs * probs.log()).sum().item()
-                #print(f"[Debug] Root policy entropy: {entropy:.3f}")
+                # print(f"[Debug] Root policy entropy: {entropy:.3f}")
 
             policy_tensor = probs.cpu()
             self.evaluation_cache[key] = (policy_tensor, 0.0)
 
         self._expand(root, policy_tensor.numpy())
 
-
     def _add_dirichlet_noise(self, root, alpha=0.3, epsilon=0.25):
         """
         Adds Dirichlet noise to the root node's prior to encourage exploration.
         """
-        actions = list(root.children.keys()) #  Get all legal actions from the root node
+        actions = list(
+            root.children.keys()
+        )  #  Get all legal actions from the root node
         num_actions = len(actions)
         if num_actions == 0:
             return  # nothing to do
@@ -341,9 +356,9 @@ class MCTS:
 
     def _init_cache(self):
         from collections import OrderedDict
+
         return OrderedDict()
 
-   
     def _game_state_to_key(self, game_state: Game):
         """
         Converts a game state to a unique key for caching.
@@ -354,6 +369,4 @@ class MCTS:
         Returns:
             _type_: _description_
         """
-        return tuple(game_state.encode(device='cpu').view(-1).tolist())
-
-
+        return tuple(game_state.encode(device="cpu").view(-1).tolist())
