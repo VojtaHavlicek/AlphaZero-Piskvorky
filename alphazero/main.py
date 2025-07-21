@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Filename: promoter.py
 Author: Vojtěch Havlíček
@@ -9,11 +8,10 @@ License: MIT
 """
 
 import torch
-import torch.nn as nn
 from games import TicTacToe
-from net import TicTacToeNet
 from monte_carlo_tree_search import MCTS
-import torch
+from net import TicTacToeNet
+from trainer import minimax
 
 
 # "models/best_3x3.pt"
@@ -36,7 +34,7 @@ def human_vs_ai(model_path=None,
             return
     
     game = TicTacToe()
-    mcts = MCTS(game_class=TicTacToe, policy_value_net=net)
+    mcts = MCTS(game_class=TicTacToe, net=net)
 
     print("You are playing as X (1). Type moves like: 3 4")
 
@@ -69,9 +67,7 @@ def human_vs_ai(model_path=None,
         print("🤝 It's a draw.")
 
 
-from trainer import minimax
 def human_vs_minimax(game_class=TicTacToe, minimax_agent=minimax, depth=9):
-    import sys
 
     game = game_class()
     print("Welcome! You're playing as X (1). Minimax is O (-1).")

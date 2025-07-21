@@ -1,6 +1,7 @@
 import torch
-from tqdm import tqdm, trange
 from monte_carlo_tree_search import MCTS  # Assuming MCTS is defined in mcts.py
+from tqdm import tqdm
+
 
 class ModelEvaluator:
     # TODO: implement parallel evaluation

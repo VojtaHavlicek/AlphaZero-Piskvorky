@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Filename: promoter.py
 Author: Vojtěch Havlíček
@@ -8,9 +7,9 @@ Description: Abstract game class and Gomoku implementation for AlphaZero algorit
 License: MIT
 """
 
-# Note: Multiplayer games? 
-import torch
 import numpy as np
+import torch
+
 
 # --- Abstract Game Class ---
 class Game:
@@ -38,13 +37,12 @@ class Game:
         return new_game
 
 
-
 # --- Gomoku ---
 class Gomoku(Game):
     def __init__(self, board_size=5, win_length=4):
         super().__init__(board_size)
-        self._winner = None
         self.win_length = win_length
+        self._winner = None
 
     def get_legal_actions(self) -> list:
         """Return a list of legal actions for the current player."""

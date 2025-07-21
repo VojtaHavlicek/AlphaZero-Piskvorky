@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Filename: promoter.py
 Author: Vojtěch Havlíček
@@ -7,9 +6,9 @@ Created: 2025-07-11
 Description: Monte Carlo Tree Search (MCTS) implementation for the AlphaZero algorithm.
 License: MIT
 """
-from typing import Type
-import numpy as np
 import random
+
+import numpy as np
 import torch
 import torch.nn
 from games import Game
@@ -42,19 +41,19 @@ class Node:
 
 class MCTS:
     def __init__(self, 
-                 game_class: Type[Game],
-                 policy_value_net: torch.nn.Module, 
+                 game_class: type[Game],
+                 net: torch.nn.Module, 
                  exploration_strength=DEFAULT_EXPLORATION_STRENGTH, 
                  num_simulations=DEFAULT_NUM_SIMULATIONS, 
                  cache_size=DEFAULT_CACHE_SIZE):
         
         self.game_class = game_class             # Type of the game, e.g., TicTacToe
-        self.policy_value_net = policy_value_net # Neural network for policy and value estimation
+        self.net = net # Neural network for policy and value estimation
         self.exploration_strength = exploration_strength # Strength of exploration in UCB formula
         self.num_simulations = num_simulations   # Number of simulations to run per move
         self.cache_size = cache_size             # Maximum size of the evaluation cache
 
-        self.device = next(policy_value_net.parameters()).device # NOTE: do I need this? 
+        self.device = next(net.parameters()).device # NOTE: do I need this? 
         self.evaluation_cache = self._init_cache()
 
 
@@ -63,7 +62,7 @@ class MCTS:
             temperature: float = 1.0, 
             add_exploration_noise: bool = False):
         """
-        Runs the MCTS algorithm on the given game state.
+        Runs the MCTS from a given game state.
 
         Args:
             game_state (Game): _description_
@@ -169,14 +168,14 @@ class MCTS:
         if not states:
             return
 
-        self.policy_value_net.eval()  # Ensure the network is in evaluation mode
+        self.net.eval()  # Ensure the network is in evaluation mode
         batch = torch.cat(states, dim=0)
         with torch.no_grad():
-            logits, values = self.policy_value_net(batch)
+            logits, values = self.net(batch)
             probs = torch.softmax(logits, dim=1)
             probs = torch.nan_to_num(probs, nan=0.0, posinf=0.0, neginf=0.0)
 
-        for key, p, v, (node, path) in zip(keys, probs, values, paths):
+        for key, p, v, (node, path) in zip(keys, probs, values, paths, strict=False):
             self.evaluation_cache[key] = (p.cpu(), v.item())
             self._expand(node, p.cpu().numpy())
             self._backpropagate(path, v.item())
@@ -248,7 +247,7 @@ class MCTS:
         probs = probs / probs.sum() if probs.sum() > 0 else torch.ones_like(probs) / len(probs)
 
         policy = torch.zeros(root.game_state.board_size**2, dtype=torch.float32, device=self.device)
-        for a, p in zip(actions, probs):
+        for a, p in zip(actions, probs, strict=False):
             idx = a[0] * root.game_state.board_size + a[1]
             policy[idx] = p.item()
 
@@ -313,7 +312,7 @@ class MCTS:
                 encoded = encoded.unsqueeze(0)
 
             with torch.no_grad():
-                logits, _ = self.policy_value_net(encoded)
+                logits, _ = self.net(encoded)
                 probs = torch.softmax(logits, dim=1).squeeze(0)
                 probs = torch.nan_to_num(probs, nan=0.0, posinf=0.0, neginf=0.0)
                 entropy = -(probs * probs.log()).sum().item()

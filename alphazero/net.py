@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Filename: promoter.py
 Author: Vojtěch Havlíček
@@ -12,7 +11,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from games import Gomoku
 
 class ResidualBlock(nn.Module):
     def __init__(self, channels):
@@ -31,15 +29,31 @@ class ResidualBlock(nn.Module):
 
 class GomokuNet(nn.Module):
     """
-    Use 
+    The idea here is to take as an input the state of the board. 
+    
+    Two outputs: 
+    1. A continuous value of the board state v_theta(s_t) in [-1,1], from the perspective of the current player. 
+    2. A policy, the probability vector over all actions.
+
+    The network is trained using the examples: 
+    (s_t, pi_t, z_t) where:
+    1. p_t is an estimate of the policy from state s_t 
+    2. z_t is the final outcome of the game from the perspective of the player at s_t (+1 if they win, -1 if they lose, 0 if draw).
+
+    The network is trained to minimize the loss (excluding regularization): 
+    l = sum_{t=1}^{T} (v_theta(s_t) - z_t)^2 - pi_t * log(p_theta(s_t))
+
+    NOTE: Othello 4 layer CNN + few feedforward works.
+    NOTE: 
 
     Args:
         nn (_type_): _description_
     """
-    def __init__(self, board_size=8, num_blocks=3):
+    def __init__(self, board_size=5):
         super().__init__()
-        num_channels = board_size * board_size # Number of channels in the network, can be adjusted
-        self.board_size = board_size
+        num_channels = 32
+        self.conv1 = nn.Conv2d(2, num_channels, kernel_size=3, padding=1)  # Input channels for Gomoku is 2 (black and white pieces)
+        self.bn1 = nn.BatchNorm2d(num_channels)
 
         self.initial_conv = nn.Sequential(
             nn.Conv2d(3, num_channels, kernel_size=3, padding=1),
@@ -62,13 +76,15 @@ class GomokuNet(nn.Module):
             nn.BatchNorm2d(1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(self.board_size * self.board_size, 64),
+            nn.Linear(self.board_size * self.board_size, self.board_size * self.board_size),  # Intermediate layer
             nn.ReLU(),
-            nn.Linear(64, 1),  # Final output for value head
+            nn.Linear(self.board_size * self.board_size, 1),  # Final output for value head
             nn.Tanh()  # Value output in range [-1, 1]
         )
 
     def forward(self, x):
+        # Input: x will have shape (batch_size, 2, board_size, board_size)
+
         x = self.initial_conv(x)
         x = self.res_blocks(x)
 

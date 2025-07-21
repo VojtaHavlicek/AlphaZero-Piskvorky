@@ -1,8 +1,10 @@
-import torch
-from torch.utils.data import DataLoader, Dataset
-import torch.nn.functional as F
-from tqdm import tqdm
 import random
+
+import torch
+import torch.nn.functional as F
+from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
+
 
 class AlphaZeroDataset(Dataset):
     def __init__(self, examples):
@@ -43,7 +45,7 @@ class NeuralNetworkTrainer:
 
         print("[Trainer] Training started...")
 
-        for epoch in tqdm(range(epochs), desc=f"[Trainer] Epochs", ncols=80):
+        for epoch in tqdm(range(epochs), desc="[Trainer] Epochs", ncols=80):
             total_loss = 0
             total_policy_loss = 0
             total_value_loss = 0
@@ -95,20 +97,14 @@ class NeuralNetworkTrainer:
         self.net.train()
 
 
-import torch
-from typing import List, Tuple
 
-import torch
-import random
-from typing import List, Tuple
-from tqdm import tqdm
 
 def generate_minimax_vs_random_dataset(
     game_class: type,
     minimax_agent,
     num_games: int = 100,
     max_depth: int = 5,
-) -> List[List[Tuple[torch.Tensor, torch.Tensor, float]]]:
+) -> list[list[tuple[torch.Tensor, torch.Tensor, float]]]:
     """
     Generate a dataset of games played between a Minimax agent and a Random agent.
     Format matches generate_self_play: a list of per-game histories.
@@ -166,7 +162,6 @@ def generate_minimax_vs_random_dataset(
 
     return all_games
 
-import random
 
 def minimax(game, depth, maximizing_player, root_player):
     if game.is_terminal() or depth == 0:

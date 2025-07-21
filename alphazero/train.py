@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Filename: promoter.py
 Author: Vojtěch Havlíček
@@ -9,15 +8,15 @@ License: MIT
 """
 
 import torch
-
-from net import TicTacToeNet
-from games import TicTacToe # NOTE: It may be worth to pakc the recommended ML model into game metadata.
-from self_play import SelfPlayManager
-from replay_buffer import ReplayBuffer
-from trainer import NeuralNetworkTrainer 
 from evaluator import ModelEvaluator
+from games import (
+    Gomoku,  # NOTE: It may be worth to pakc the recommended ML model into game metadata.
+)
+from net import GomokuNet
 from promoter import ModelPromoter
-from trainer import generate_minimax_vs_random_dataset, minimax
+from replay_buffer import ReplayBuffer
+from self_play import SelfPlayManager
+from trainer import NeuralNetworkTrainer, generate_minimax_vs_random_dataset, minimax
 
 # Ultimate TicTacToe implementation: 
 # Uses BATCH_SIZE = 2048, 
@@ -38,8 +37,8 @@ from trainer import generate_minimax_vs_random_dataset, minimax
 
 
 # --- Parameters ---
-BOARD_SIZE = 3
-WIN_LENGTH = 3
+BOARD_SIZE = 5
+WIN_LENGTH = 4
 NUM_EPISODES = 10
 NUM_SELF_PLAY_GAMES = 150 # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
 BATCH_SIZE = 128
@@ -50,9 +49,6 @@ BOOTSTRAP = False
 MODEL_DIR = "models"
 
 
-import torch
-
-
 if __name__ == "__main__":
 
     # Set up multiprocessing for MPS backend
@@ -61,11 +57,11 @@ if __name__ == "__main__":
     device = "cpu" #torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
     # Initialize network, promoter, and replay buffer
-    net = TicTacToeNet().to(device)
-    self_play_manager = SelfPlayManager(net, TicTacToe)  
+    net = GomokuNet(board_size=BOARD_SIZE).to(device)
+    self_play_manager = SelfPlayManager(net, Gomoku)  
     buffer = ReplayBuffer(capacity=BUFFER_CAPACITY)
-    evaluator = ModelEvaluator(TicTacToe)
-    promoter = ModelPromoter(model_dir=MODEL_DIR, evaluator=evaluator, net_class=TicTacToeNet)
+    evaluator = ModelEvaluator(Gomoku)
+    promoter = ModelPromoter(model_dir=MODEL_DIR, evaluator=evaluator, net_class=GomokuNet)
     trainer = NeuralNetworkTrainer(net, device=device)
     
     
@@ -74,7 +70,7 @@ if __name__ == "__main__":
     if BOOTSTRAP:
         print("[Bootstrap] Generating minimax dataset...")
         bootstrap_data = generate_minimax_vs_random_dataset(
-            game_class=TicTacToe,
+            game_class=Gomoku,
             minimax_agent=minimax,
             num_games=BATCH_SIZE//4, 
             max_depth=9,
@@ -98,7 +94,7 @@ if __name__ == "__main__":
         print(f"[Trainer] Training on {BATCH_SIZE} examples...")
         examples = buffer.sample_batch(BATCH_SIZE)
         trainer.train(examples, epochs=NUM_EPOCHS)
-        print(f"[Trainer] Training complete.")
+        print("[Trainer] Training complete.")
         print("[Debug] Candidate policy logits (first 5):", net(torch.zeros(1, 3, 3, 3).to(device))[0][0][:5].detach().cpu().numpy())
 
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Filename: promoter.py
 Author: Vojtěch Havlíček
@@ -8,11 +7,10 @@ Description: Self-play implementation for AlphaZero algorithm.
 License: MIT
 """
 
-from typing import List
+
 import torch
 from monte_carlo_tree_search import MCTS
 from tqdm import tqdm
-
 
  # --- Parameters ---
 NUM_EPISODES = 100
@@ -20,19 +18,11 @@ NUM_SELF_PLAY_GAMES = 100
 BATCH_SIZE = 64
 MODEL_DIR = "models"
 
-import time
-import torch
-import torch.multiprocessing as mp
+from collections.abc import Callable
 from queue import Empty
-from typing import List, Type
-from monte_carlo_tree_search import MCTS
 
-import time
-import torch
 import torch.multiprocessing as mp
-from queue import Empty
-from typing import List, Type, Callable
-from monte_carlo_tree_search import MCTS
+
 
 def default_temperature_schedule(move: int) -> float:
     if move < 3:
@@ -49,7 +39,7 @@ class SelfPlayManager:
     def __init__(
         self,
         net: torch.nn.Module,
-        game_class: Type,
+        game_class: type,
         mcts_params: dict = None,
         temperature_schedule: Callable[[int], float] = default_temperature_schedule,
     ):
@@ -62,7 +52,6 @@ class SelfPlayManager:
 
     def _worker(self, task_queue: 'mp.Queue', result_queue: 'mp.Queue', state_dict):
 
-        import numpy as np
         torch.set_num_threads(1)
 
         policy_value_net = self.net_class()
@@ -71,7 +60,7 @@ class SelfPlayManager:
 
         mcts = MCTS(
             game_class=self.game_class,
-            policy_value_net=policy_value_net)
+            net=policy_value_net)
 
         while True:
             try:
@@ -122,7 +111,7 @@ class SelfPlayManager:
     def generate_self_play(self, 
                            num_games: int, 
                            num_workers: int = None, 
-                           flatten=True) -> List:
+                           flatten=True) -> list:
         """
         Generate self-play games using multiple workers.
 

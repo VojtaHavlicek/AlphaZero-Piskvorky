@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Filename: promoter.py
 Author: Vojtěch Havlíček
@@ -8,16 +7,18 @@ Description: Keeps track of the best model and promotes a new model if it exceed
 License: MIT
 """
 
-from datetime import datetime
 import os
+from datetime import datetime
+
 import torch
+
 
 class ModelPromoter:
     def __init__(self, 
                  model_dir, 
                  evaluator, 
                  net_class, 
-                 threshold=0.52, 
+                 threshold=0.55, 
                  device="cpu"):
         self.model_dir = model_dir
         self.evaluator = evaluator

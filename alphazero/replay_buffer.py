@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Filename: replay_buffer.py
 Author: Vojtěch Havlíček
@@ -20,7 +19,10 @@ class ReplayBuffer:
     def add(self, game_examples):
         """
         Add a list of game examples to the buffer.
-        FIFO 
+        FIFO behavior is maintained by using a deque with a maximum length.
+
+        Examples should be in the format:
+        
 
         Args:
             game_examples (list): List of game examples to add.
