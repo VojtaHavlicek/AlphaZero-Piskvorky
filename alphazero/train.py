@@ -41,11 +41,12 @@ BOARD_SIZE = 5
 WIN_LENGTH = 4
 NUM_EPISODES = 10
 NUM_SELF_PLAY_GAMES = 150  # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
+NUM_WORKERS = 8  # Adjust based on your CPU cores. 
 BATCH_SIZE = 128
 NUM_EPOCHS = 10
 EVALUATION_GAMES = 50
 BUFFER_CAPACITY = 1_000
-BOOTSTRAP = False
+MINIMAX_BOOTSTRAP = False
 MODEL_DIR = "models"
 
 
@@ -70,7 +71,7 @@ if __name__ == "__main__":
 
     # TODO: Make sure not to contaminate the model directory with old models.
     # Optional: only do this if model has not trained before
-    if BOOTSTRAP:
+    if MINIMAX_BOOTSTRAP:
         print("[Bootstrap] Generating minimax dataset...")
         bootstrap_data = generate_minimax_vs_random_dataset(
             game_class=Gomoku,
@@ -86,7 +87,8 @@ if __name__ == "__main__":
 
         # ---- Self-play games ----
         data = self_play_manager.generate_self_play(
-            num_games=NUM_SELF_PLAY_GAMES, num_workers=4
+            num_games=NUM_SELF_PLAY_GAMES, 
+            num_workers=NUM_WORKERS # Adjust number of workers based on your CPU cores
         )
 
         print(f"[Buffer]: size: {len(buffer)}")

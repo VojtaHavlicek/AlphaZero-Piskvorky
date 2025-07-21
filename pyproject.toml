@@ -1,0 +1,6 @@
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+select = ["E", "F", "I", "N", "B", "UP", "C4"]
+ignore = ["E501"]  # Ignore line-too-long if you're using black
+fix = true

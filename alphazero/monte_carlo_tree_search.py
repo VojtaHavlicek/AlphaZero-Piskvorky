@@ -329,7 +329,6 @@ class MCTS:
                 logits, _ = self.net(encoded)
                 probs = torch.softmax(logits, dim=1).squeeze(0)
                 probs = torch.nan_to_num(probs, nan=0.0, posinf=0.0, neginf=0.0)
-                entropy = -(probs * probs.log()).sum().item()
                 # print(f"[Debug] Root policy entropy: {entropy:.3f}")
 
             policy_tensor = probs.cpu()
