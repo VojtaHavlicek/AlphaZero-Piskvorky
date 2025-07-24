@@ -14,18 +14,25 @@ import torch
 # THE CURRENT PLAYER IS ALWAYS IN THE FIRST CHANNEL,
 # AND THE OPPONENT IS IN THE SECOND CHANNEL.
 
+X = "X"
+O = "O"
+DRAW = "D"
 
 # --- Abstract Game Class ---
 class Game:
     def __init__(self, board_size):
         self.board_size = board_size
-        self.board = [[0] * board_size for _ in range(board_size)]
-        self.current_player = "X"
+        self.board = [[None] * board_size for _ in range(board_size)]
+        self.current_player = X
 
     def get_legal_actions(self) -> list:
         """Return a list of legal actions for the current player."""
         pass
 
+    def get_other_player(self, player) -> str:
+        pass
+
+    
     def apply_action(self, action) -> "Game":
         pass
 
@@ -59,8 +66,16 @@ class Gomoku(Game):
             (r, c)
             for r in range(self.board_size)
             for c in range(self.board_size)
-            if self.board[r][c] == 0
+            if self.board[r][c] is None
         ]
+    
+    def get_other_player(self, player) -> str:
+        """
+        Returns the other player.
+        """
+        if player not in (X, O):
+            raise ValueError(f"Invalid player: {player}. Must be 'X' or 'O'.")
+        return O if player == X else X
 
     def apply_action(self, action) -> "Gomoku":
         """
@@ -68,11 +83,11 @@ class Gomoku(Game):
         Returns a new game state with the action applied.
         """
         r, c = action
-        if self.board[r][c] != 0:
+        if self.board[r][c] is not None:
             raise ValueError("Invalid move")
         new_game = self.clone()
         new_game.board[r][c] = self.current_player
-        new_game.current_player *= -1
+        new_game.current_player = self.get_other_player(new_game.current_player)
         return new_game
 
     def _check_line(self, r, c, dr, dc, player) -> bool:
@@ -102,7 +117,7 @@ class Gomoku(Game):
         # Check for a winner
         for r in range(self.board_size):
             for c in range(self.board_size):
-                if self.board[r][c] == 0:
+                if self.board[r][c] is None:
                     continue
                 player = self.board[r][c]
                 # Check horizontal, vertical, and diagonal lines
@@ -116,11 +131,11 @@ class Gomoku(Game):
                     return True
         # Check for a draw
         if all(
-            self.board[r][c] != 0
+            self.board[r][c] is not None
             for r in range(self.board_size)
             for c in range(self.board_size)
         ):
-            self._winner = 0
+            self._winner = DRAW
             return True
         return False
 
@@ -128,7 +143,7 @@ class Gomoku(Game):
         """Return the winner of the game."""
         if not self.is_terminal():
             return None
-        return self._winner if self._winner is not None else 0
+        return self._winner if self._winner is not None else DRAW
 
     def encode(self, device="cpu") -> torch.Tensor:
         """
@@ -151,9 +166,9 @@ class Gomoku(Game):
         )
         for r in range(self.board_size):
             for c in range(self.board_size):
-                if self.board[r][c] == 1:
+                if self.board[r][c] == self.current_player:
                     encoded[0, r, c] = 1.0
-                elif self.board[r][c] == -1:
+                elif self.board[r][c] == self.get_other_player(self.current_player):
                     encoded[1, r, c] = 1.0
         return encoded.view(
             1, 2, self.board_size, self.board_size
@@ -178,7 +193,7 @@ class Gomoku(Game):
         """
         board_str = "\n".join(
             " | ".join(
-                "X" if self.board[i][j] == 1 else "O" if self.board[i][j] != 0 else " "
+                self.board[i][j] if self.board[i][j] is not None else " "
                 for j in range(self.board_size)
             )
             for i in range(self.board_size)

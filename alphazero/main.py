@@ -8,7 +8,7 @@ License: MIT
 """
 
 import torch
-from games import Gomoku
+from games import Gomoku, X, O
 from monte_carlo_tree_search import MCTS
 from net import GomokuNet
 
@@ -48,9 +48,9 @@ def human_vs_ai(model_path=None, model=None):
     print(f"You are playing {GAME_CLASS}")
 
     while not game.is_terminal():
-        print_board(game)
+        print(game)
 
-        if game.current_player == 1:
+        if game.current_player == X:
             move = input("Your move (row col): ")
 
             # TODO: sanitize input
@@ -66,29 +66,15 @@ def human_vs_ai(model_path=None, model=None):
             print(f"🤖 AI plays: {action}")
             game = game.apply_action(action)
 
-    print_board(game)
+    print(game)
     winner = game.get_winner()
-    if winner == 1:
+    if winner == X:
         print("🎉 You win!")
-    elif winner == -1:
+    elif winner == O:
         print("💀 You lost.")
     else:
         print("🤝 It's a draw.")
 
-
-def print_board(game):
-    for r in range(game.size):
-        row = ""
-        for c in range(game.size):
-            val = game.board[r][c]
-            if val == 1:
-                row += " X"
-            elif val == -1:
-                row += " O"
-            else:
-                row += " ."
-        print(row)
-    print()
 
 
 if __name__ == "__main__":

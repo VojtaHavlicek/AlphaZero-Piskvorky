@@ -14,7 +14,7 @@ import torch
 
 
 class ModelPromoter:
-    def __init__(self, model_dir, evaluator, net_class, threshold=0.55, device="cpu"):
+    def __init__(self, model_dir, evaluator, net_class, threshold=0.50, device="cpu"):
         self.model_dir = model_dir
         self.evaluator = evaluator
         self.net_class = net_class  # To reinstantiate best model
@@ -24,7 +24,6 @@ class ModelPromoter:
         self.best_path = self._find_latest_model()
 
     def get_best_model(self):
-        print(f"[Promoter] Looking for the best model in {self.model_dir}...")
         if self.best_path is None:
             print("[Promoter] Choosen a randomly initialized model.")
             return self.net_class().to(self.device)

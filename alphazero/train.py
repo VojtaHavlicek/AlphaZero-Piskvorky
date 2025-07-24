@@ -40,12 +40,12 @@ from trainer import NeuralNetworkTrainer
 BOARD_SIZE = 5
 WIN_LENGTH = 4
 NUM_EPISODES = 10
-NUM_SELF_PLAY_GAMES = 500  # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
+NUM_SELF_PLAY_GAMES = 100  # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
 NUM_WORKERS = 8  # Adjust based on your CPU cores.
-BATCH_SIZE = 1024
-NUM_EPOCHS = 10
+BATCH_SIZE = 256
+NUM_EPOCHS = 5
 EVALUATION_GAMES = 100
-BUFFER_CAPACITY = 10_000
+BUFFER_CAPACITY = 5_000
 MODEL_DIR = "models"
 
 
@@ -90,10 +90,7 @@ if __name__ == "__main__":
         examples = buffer.sample_batch(BATCH_SIZE)
         trainer.train(examples, epochs=NUM_EPOCHS)
         print("[Trainer] Training complete.")
-        #print(
-        #    "[Debug] Candidate policy logits (first 5):",
-        #    net(torch.zeros(1, 2, 5, 5).to(device))[0][0][:5].detach().cpu().numpy(),
-        #)
+       
 
         # ---- Evaluate and promote if better ----
         best_net = promoter.get_best_model()
@@ -113,3 +110,4 @@ if __name__ == "__main__":
         print(f"[Summary] Win rate: {win_rate:.2%} | Metrics: {metrics}")
 
     print(f"[Promoter] Number of promotions during the batch: {number_of_promotions}")
+    buffer.save("buffer.pkl")  # Save the replay buffer for future use

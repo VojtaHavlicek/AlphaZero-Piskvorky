@@ -10,6 +10,7 @@ License: MIT
 import torch
 from monte_carlo_tree_search import MCTS
 from tqdm import tqdm
+from games import O, X, DRAW
 
 # --- Parameters ---
 NUM_EPISODES = 100
@@ -75,7 +76,7 @@ class SelfPlayManager:
                 while not game_state.is_terminal():
                     temp = self.temperature_schedule(move_num)
 
-                    
+
                     policy, action = mcts.run(
                         game_state=game_state,
                         temperature=temp,
@@ -83,20 +84,24 @@ class SelfPlayManager:
                     )
 
                     state = game_state.encode().squeeze(0)
+                    if game_state.current_player not in (X, O):
+                        raise ValueError(
+                            f"Invalid current player: {game_state.current_player}. Must be 'X' or 'O'."
+                        )
                     history.append((state, policy, game_state.current_player))
                     game_state = game_state.apply_action(action)
                    
 
                 winner = game_state.get_winner()
-                state = game_state.encode().squeeze(0)
+                #state = game_state.encode().squeeze(0)
 
                 data = [
                     (
                         state,
                         policy,
-                        1.0 if winner == p else -1.0 if winner == -p else 0.0,
+                        0 if winner == DRAW else 1 if current_player == winner else -1
                     )
-                    for state, policy, p in history
+                    for state, policy, current_player in history
                 ]  # This is the full selfplay history.
 
                 # print(f"Data: \n {data} \n -----------------")

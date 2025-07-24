@@ -64,9 +64,12 @@ class NeuralNetworkTrainer:
 
                 pred_policy, pred_value = self.net(state)
 
+                policy = policy / policy.sum(dim=1, keepdim=True).clamp(min=1e-8)
+
+
                 # --- LOSS ---
                 log_probs = F.log_softmax(pred_policy, dim=1)
-                loss_policy = F.kl_div(log_probs, policy, reduction="batchmean")
+                loss_policy = -(policy * log_probs).sum(dim=1).mean()
                 loss_value = self.value_loss_fn(pred_value, value)
                 loss = loss_policy + loss_value
 

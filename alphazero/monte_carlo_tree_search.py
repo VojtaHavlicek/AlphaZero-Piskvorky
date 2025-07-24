@@ -13,6 +13,7 @@ import numpy as np
 import torch
 import torch.nn
 from games import Game
+from games import X, O, DRAW
 
 DEFAULT_CACHE_SIZE = 100_000  # Default size for the evaluation cache
 DEFAULT_NUM_SIMULATIONS = 100  # Default number of simulations per move
@@ -134,14 +135,17 @@ class MCTS:
             float: _description_
         """
         winner = game_state.get_winner()
-        if winner == 0:
+
+        if winner is None or winner not in (X, O, DRAW):
+            raise ValueError(f"Unexpected winner value: {winner}")
+
+        if winner == DRAW:
             return 0.0
         elif winner == root_player:
             return 1.0
-        elif winner == -root_player:
-            return -1.0
         else:
-            raise ValueError(f"Unexpected winner value: {winner}")
+            return -1.0
+       
 
     def _evaluate_and_backpropagate(self, pending):
         """

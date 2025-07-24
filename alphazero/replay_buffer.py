@@ -46,6 +46,30 @@ class ReplayBuffer:
             list: List of all examples in the buffer.
         """
         return list(self.buffer)
+    
+    def save(self, filename: str):
+        """
+        Save the buffer to a file.
+
+        Args:
+            filename (str): The name of the file to save the buffer to.
+        """
+        import pickle
+        with open(filename, 'wb') as f:
+            pickle.dump(self.buffer, f)
+
+    def load(self, filename: str):
+        """
+        Load the buffer from a file.
+
+        Args:
+            filename (str): The name of the file to load the buffer from.
+        """
+        import pickle
+        with open(filename, 'rb') as f:
+            self.buffer = deque(pickle.load(f), maxlen=self.buffer.maxlen)
+
+    
 
     def __len__(self) -> int:
         return len(self.buffer)
