@@ -43,10 +43,13 @@ class SelfPlayManager:
         mcts_params: dict = None,
         temperature_schedule: Callable[[int], float] = default_temperature_schedule,
     ):
-        self.net = net
+        # The neural network model. 
+        # It contains the policy and value head; policy head is used for MCTS search and is learned from MCTS 
+        # simulations, value head is used to predict the game outcome.
+        self.net = net 
         self.net_class = type(net)
         self.game_class = game_class
-        self.mcts_params = mcts_params or {"num_simulations": 200}
+        self.mcts_params = mcts_params or {"num_simulations": 100}
         self.temperature_schedule = temperature_schedule
 
     def _worker(self, task_queue: "mp.Queue", result_queue: "mp.Queue", state_dict):
@@ -71,24 +74,22 @@ class SelfPlayManager:
 
                 while not game_state.is_terminal():
                     temp = self.temperature_schedule(move_num)
-                    # print(f"[Worker {task_id}] Starting move {move_num} with temperature {temp:.2f}")
+
+                    
                     policy, action = mcts.run(
                         game_state=game_state,
                         temperature=temp,
                         add_exploration_noise=True,
                     )
 
-                    # print(f"[Worker {task_id}] Policy: {policy.cpu().numpy().round(3)}")
                     state = game_state.encode().squeeze(0)
                     history.append((state, policy, game_state.current_player))
                     game_state = game_state.apply_action(action)
-                    move_num += 1
-                    # print(f"[Worker {task_id}] Move {move_num}: Player {game.current_player}, Action: {action}, Temp: {temp:.2f} \n{game}")
-                # print(f"[Worker {task_id}] Game finished after {move_num} moves.")
+                   
+
                 winner = game_state.get_winner()
                 state = game_state.encode().squeeze(0)
 
-                # Check if the encoding works:
                 data = [
                     (
                         state,
@@ -108,7 +109,10 @@ class SelfPlayManager:
         # Terminated
 
     def generate_self_play(
-        self, num_games: int, num_workers: int = None, flatten=True
+        self, 
+        num_games: int, 
+        num_workers: int = None, 
+        flatten=True
     ) -> list:
         """
         Generate self-play games using multiple workers.

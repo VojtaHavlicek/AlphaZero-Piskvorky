@@ -49,8 +49,28 @@ The training pipeline loops over three things:
         - If the new model wins more than 55-60%, promote it as the new best. 
         - This can be adaptive (using Elo ratings or statistical significance testing)
 
+4. Value and Policy head
+    * AlphaZero's neural net predicts two things for any given position:
+        - Policy head: A probability distribution over all possible moves
+        - Value head: Scalar that estimates the final outcome from a given position (win/loss/draw)
 
-4. Miscelaneous notes:  
+    * Policy head: predicts which moves are likely to be good 
+        - used by MCTS as it does not explore moves uniformly
+        - focuses on promising moves suggested by the network, speeding up search, improving quality
+        - learns from **MCTS visit counts** during the training. 
+    
+    * Value head
+        - predicts how good is the current position for **the player to move**! 
+        - eliminates the need to rollout to terminal states during search. 
+            - In classical MCTS before Zero, needed rollouts. Not here! 
+            - Stop early and use the value estimate. 
+
+        - Learns from **game outcomes** 
+
+    
+
+
+5. Miscelaneous notes:  
     * MCTS
         - Use temperature annealing for exploration early in training, low for precise eval later in the optimization 
         - Dirichlet noise: add to the root node during self-play to encourage exploration 

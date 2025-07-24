@@ -1,10 +1,13 @@
 import torch
-from monte_carlo_tree_search import MCTS  # Assuming MCTS is defined in mcts.py
+from monte_carlo_tree_search import MCTS
 from tqdm import tqdm
 
 
 class ModelEvaluator:
-    # TODO: implement parallel evaluation
+    """
+    Evaluates a candidate neural network against a baseline network using MCTS.
+    """
+
     def __init__(
         self, game_class, mcts_class=None, mcts_params=None, print_games=False
     ):
@@ -37,28 +40,29 @@ class ModelEvaluator:
                     encoded = game.encode().to(device)
                     policy_logits, value = candidate_net(encoded)
                     policy_probs = torch.softmax(policy_logits, dim=1)
-                    print("\n[Debug] Initial raw policy probabilities:")
-                    print(policy_probs.cpu().numpy().reshape(-1))
-                    print(f"[Debug] Initial value prediction: {value.item():.4f}")
+                    #if debug:
+                        #print("\n[Debug] Initial raw policy probabilities:")
+                        #print(policy_probs.cpu().numpy().reshape(-1))
+                        #print(f"[Debug] Initial value prediction: {value.item():.4f}")
 
             while not game.is_terminal():
                 mcts = player_order[0] if game.current_player == 1 else player_order[1]
                 policy, action = mcts.run(game, temperature=0)
 
-                if debug:
-                    print(
-                        f"[Debug] Player {game.current_player} selects action: {action}"
-                    )
-                    print(f"[Debug] Policy: {policy.cpu().numpy().round(3)}")
-                    print(f"[Debug] State after action {action}:\n{game}\n------")
+                # if debug:
+                #    print(
+                #        f"[Debug] Player {game.current_player} selects action: {action}"
+                #    )
+                #    print(f"[Debug] Policy: {policy.cpu().numpy().round(3)}")
+                #    print(f"[Debug] State after action {action}:\n{game}\n------")
 
                 move_sequence.append(action)
                 game = game.apply_action(action)
 
             if debug:
-                print(f"[Debug] Game {i} move sequence: {move_sequence}")
+                #print(f"[Debug] Game {i} move sequence: {move_sequence}")
                 print(game)
-                print("------")
+                #print("------")
 
             winner = game.get_winner()
             if winner == 1:

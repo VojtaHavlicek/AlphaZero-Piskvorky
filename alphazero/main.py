@@ -8,23 +8,32 @@ License: MIT
 """
 
 import torch
-from games import TicTacToe
+from games import Gomoku
 from monte_carlo_tree_search import MCTS
-from net import TicTacToeNet
-from trainer import minimax
+from net import GomokuNet
+
+GAME_CLASS = Gomoku
+GAME_CLASS_NET = GomokuNet
 
 
 # "models/best_3x3.pt"
 def human_vs_ai(model_path=None, model=None):
+    """
+    Play a game against an AI using a trained model.
+
+    Args:
+        model_path (_type_, optional): _description_. Defaults to None.
+        model (_type_, optional): _description_. Defaults to None.
+    """
     if model is not None:
         net = model
     elif model_path is not None:
-        net = TicTacToeNet()
+        net = GAME_CLASS_NET()
         net.load_state_dict(torch.load(model_path, map_location="cpu"))
         net.eval()
     else:
         try:
-            net = TicTacToeNet()
+            net = GAME_CLASS_NET()
             net.load_state_dict(torch.load("models/best_3x3.pt", map_location="cpu"))
             net.eval()
         except FileNotFoundError:
@@ -33,10 +42,10 @@ def human_vs_ai(model_path=None, model=None):
             )
             return
 
-    game = TicTacToe()
-    mcts = MCTS(game_class=TicTacToe, net=net)
+    game = GAME_CLASS()
+    mcts = MCTS(game_class=GAME_CLASS, net=net)
 
-    print("You are playing as X (1). Type moves like: 3 4")
+    print(f"You are playing {GAME_CLASS}")
 
     while not game.is_terminal():
         print_board(game)
@@ -67,43 +76,6 @@ def human_vs_ai(model_path=None, model=None):
         print("🤝 It's a draw.")
 
 
-def human_vs_minimax(game_class=TicTacToe, minimax_agent=minimax, depth=9):
-    game = game_class()
-    print("Welcome! You're playing as X (1). Minimax is O (-1).")
-    print(game)
-
-    while not game.is_terminal():
-        if game.current_player == 1:
-            # Human turn
-            try:
-                move = input("Your move (row col): ").strip()
-                row, col = map(int, move.split())
-                if (row, col) not in game.get_legal_actions():
-                    print("❌ Illegal move. Try again.")
-                    continue
-                action = (row, col)
-            except Exception:
-                print("❌ Invalid input format. Please use: row col (e.g., 1 1)")
-                continue
-        else:
-            # Minimax turn
-            _, action = minimax_agent(
-                game, depth, maximizing_player=True, root_player=game.current_player
-            )
-            print(f"\n🤖 Minimax plays: {action}")
-
-        game = game.apply_action(action)
-        print(game)
-
-    winner = game.get_winner()
-    if winner == 1:
-        print("🎉 You win!")
-    elif winner == -1:
-        print("💻 Minimax wins!")
-    else:
-        print("🤝 It's a draw.")
-
-
 def print_board(game):
     for r in range(game.size):
         row = ""
@@ -120,4 +92,4 @@ def print_board(game):
 
 
 if __name__ == "__main__":
-    human_vs_minimax()
+    human_vs_ai() 

@@ -1,4 +1,3 @@
-import random
 
 import torch
 import torch.nn.functional as F
@@ -65,8 +64,9 @@ class NeuralNetworkTrainer:
 
                 pred_policy, pred_value = self.net(state)
 
+                # --- LOSS ---
                 log_probs = F.log_softmax(pred_policy, dim=1)
-                loss_policy = -torch.sum(policy * log_probs) / policy.size(0)
+                loss_policy = F.kl_div(log_probs, policy, reduction="batchmean")
                 loss_value = self.value_loss_fn(pred_value, value)
                 loss = loss_policy + loss_value
 
@@ -108,110 +108,3 @@ class NeuralNetworkTrainer:
 
     def train_mode(self):
         self.net.train()
-
-
-def generate_minimax_vs_random_dataset(
-    game_class: type,
-    minimax_agent,
-    num_games: int = 100,
-    max_depth: int = 5,
-) -> list[list[tuple[torch.Tensor, torch.Tensor, float]]]:
-    """
-    Generate a dataset of games played between a Minimax agent and a Random agent.
-    Format matches generate_self_play: a list of per-game histories.
-
-    Args:
-        game_class: A class implementing the Game interface.
-        minimax_agent: A function(game_state, depth, maximizing_player, root_player) -> (value, action)
-        num_games: Number of games to simulate.
-        max_depth: Search depth for minimax.
-
-    Returns:
-        List of per-game histories: List[List[(state_tensor, policy_tensor, value)]]
-    """
-    all_games = []
-
-    for game_index in tqdm(range(num_games), desc="[Bootstrap] Generating", ncols=80):
-        game = game_class()
-
-        # Alternate who starts
-        minimax_player = 1 if game_index % 2 == 0 else -1
-        random_player = -minimax_player
-        game.current_player = 1
-
-        game_history = []
-
-        while not game.is_terminal():
-            current_player = game.current_player
-            size = game.size
-
-            # Choose action
-            if current_player == minimax_player:
-                _, action = minimax_agent(
-                    game,
-                    depth=max_depth,
-                    maximizing_player=True,
-                    root_player=current_player,
-                )
-            else:
-                legal_actions = game.get_legal_actions()
-                action = random.choice(legal_actions) if legal_actions else None
-
-            if action is None:
-                break
-
-            state = game.encode().squeeze(0)
-            policy = torch.zeros(size * size, dtype=torch.float32)
-            idx = action[0] * size + action[1]
-            policy[idx] = 1.0
-
-            game_history.append((state, policy, current_player))
-            game = game.apply_action(action)
-
-        # Assign outcome value to each move in game history
-        winner = game.get_winner()
-        labeled_history = [
-            (
-                state,
-                policy,
-                1.0 if winner == player else -1.0 if winner == -player else 0.0,
-            )
-            for state, policy, player in game_history
-        ]
-        all_games.append(labeled_history)
-
-    return all_games
-
-
-def minimax(game, depth, maximizing_player, root_player):
-    if game.is_terminal() or depth == 0:
-        winner = game.get_winner()
-        if winner == root_player:
-            return 1, None
-        elif winner == -root_player:
-            return -1, None
-        else:
-            return 0, None
-
-    best_value = float("-inf") if maximizing_player else float("inf")
-    best_actions = []
-
-    for action in game.get_legal_actions():
-        child = game.apply_action(action)
-        val, _ = minimax(child, depth - 1, not maximizing_player, root_player)
-
-        if maximizing_player:
-            if val > best_value:
-                best_value = val
-                best_actions = [action]
-            elif val == best_value:
-                best_actions.append(action)
-        else:
-            if val < best_value:
-                best_value = val
-                best_actions = [action]
-            elif val == best_value:
-                best_actions.append(action)
-
-    best_action = random.choice(best_actions) if best_actions else None
-    return best_value, best_action

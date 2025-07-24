@@ -15,7 +15,7 @@ import torch.nn
 from games import Game
 
 DEFAULT_CACHE_SIZE = 100_000  # Default size for the evaluation cache
-DEFAULT_NUM_SIMULATIONS = 250  # Default number of simulations per move
+DEFAULT_NUM_SIMULATIONS = 100  # Default number of simulations per move
 DEFAULT_EXPLORATION_STRENGTH = 1.4  # Default exploration strength for UCB
 
 
