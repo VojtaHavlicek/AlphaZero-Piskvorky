@@ -14,7 +14,7 @@ class ModelEvaluator:
     ):
         self.game_class = game_class
         self.mcts_class = mcts_class if mcts_class is not None else MCTS
-        self.mcts_params = mcts_params or {}
+        self.mcts_params = mcts_params or {"exploration_strength": 1.0, "num_simulations": 100}
         self.print_games = print_games  # Whether to print game states during evaluation
 
     def evaluate(self, candidate_net, baseline_net, num_games=20, debug=False):
@@ -62,14 +62,17 @@ class ModelEvaluator:
             winner = game.get_winner()
             if winner == candidate_symbol:
                 candidate_wins += 1
+                print(f"[Evaluator] Candidate wins! Game {i+1}/{num_games}")
             elif winner == baseline_symbol:
                 baseline_wins += 1
+                print(f"[Evaluator] Baseline wins! Game {i+1}/{num_games}")
             else:
                 draws += 1
+                print(f"[Evaluator] Draw! Game {i+1}/{num_games}")
 
-        total = candidate_wins + baseline_wins
+        total = candidate_wins + baseline_wins + draws  # Use 0.5 for draws to balance the win rate calculation
         win_rate = (
-            candidate_wins / total if total > 0 else 0.5
+            (candidate_wins + 0.5*draws) / total
         )  # Default to 50% if no games were played
         print(
             f"[Evaluator]: Candidate Win Rate: {win_rate:.2%} (W:{candidate_wins} L:{baseline_wins} D:{draws})"

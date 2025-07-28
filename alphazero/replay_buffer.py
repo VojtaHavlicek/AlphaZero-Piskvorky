@@ -67,6 +67,7 @@ class ReplayBuffer:
         """
         import pickle
         with open(filename, 'rb') as f:
+            print(f"[ReplayBuffer:] Loading replay buffer from {filename}...")
             self.buffer = deque(pickle.load(f), maxlen=self.buffer.maxlen)
 
     

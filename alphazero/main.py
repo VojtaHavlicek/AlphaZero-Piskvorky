@@ -11,10 +11,13 @@ import torch
 from games import Gomoku, X, O
 from monte_carlo_tree_search import MCTS
 from net import GomokuNet
+from promoter import ModelPromoter
 
 GAME_CLASS = Gomoku
 GAME_CLASS_NET = GomokuNet
 
+# Question: Human in the loop? 
+# Can I play the model and generate new training data?
 
 # "models/best_3x3.pt"
 def human_vs_ai(model_path=None, model=None):
@@ -33,9 +36,9 @@ def human_vs_ai(model_path=None, model=None):
         net.eval()
     else:
         try:
-            net = GAME_CLASS_NET()
-            net.load_state_dict(torch.load("models/best_3x3.pt", map_location="cpu"))
-            net.eval()
+            promoter = ModelPromoter(
+            model_dir="models", evaluator=None, net_class=GomokuNet)
+            net = promoter.get_best_model()
         except FileNotFoundError:
             print(
                 "No model found. Please provide a valid model path or load a pre-trained model."

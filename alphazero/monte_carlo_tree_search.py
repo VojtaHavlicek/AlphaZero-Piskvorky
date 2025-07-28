@@ -16,7 +16,7 @@ from games import Game
 from games import X, O, DRAW
 
 DEFAULT_CACHE_SIZE = 100_000  # Default size for the evaluation cache
-DEFAULT_NUM_SIMULATIONS = 100  # Default number of simulations per move
+DEFAULT_NUM_SIMULATIONS = 500  # Default number of simulations per move
 DEFAULT_EXPLORATION_STRENGTH = 1.4  # Default exploration strength for UCB
 
 
@@ -58,6 +58,8 @@ class MCTS:
 
         self.device = next(net.parameters()).device  # NOTE: do I need this?
         self.evaluation_cache = self._init_cache()
+
+        print(f"[MCTS] Initialized MCTS with exploration strength: {exploration_strength}, num_simulations: {num_simulations}")
 
     def run(
         self,

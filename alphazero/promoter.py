@@ -14,7 +14,7 @@ import torch
 
 
 class ModelPromoter:
-    def __init__(self, model_dir, evaluator, net_class, threshold=0.50, device="cpu"):
+    def __init__(self, model_dir, evaluator, net_class, threshold=0.55, device="cpu"):
         self.model_dir = model_dir
         self.evaluator = evaluator
         self.net_class = net_class  # To reinstantiate best model

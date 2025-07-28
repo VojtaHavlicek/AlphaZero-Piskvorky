@@ -24,7 +24,17 @@ class AlphaZeroDataset(Dataset):
 
 
 class NeuralNetworkTrainer:
-    def __init__(self, net, lr=1e-3, batch_size=64, device=None):
+
+#lr_schedule={
+#            0: 5e-5,
+#            1000: 1e-4,
+#            2000: 2e-4,
+#            3000: 3e-4,
+#            50000: 1e-4,
+#            85000: 3e-5,
+#        },
+
+    def __init__(self, net, batch_size, lr=1e-4, device=None):
         if device is None:
             device = torch.device(
                 "mps"
@@ -37,7 +47,7 @@ class NeuralNetworkTrainer:
 
         self.net = net.to(self.device).to(torch.float32)
         self.batch_size = batch_size
-        self.optimizer = torch.optim.Adam(self.net.parameters(), lr=lr)
+        self.optimizer = torch.optim.AdamW(self.net.parameters(), lr=lr, weight_decay=1e-4) #Adam(self.net.parameters(), lr=lr)
         self.value_loss_fn = torch.nn.MSELoss()
         self.training_history = []
 
@@ -50,7 +60,7 @@ class NeuralNetworkTrainer:
         dataloader = self._prepare_data(examples)
         self.net.train()
 
-        print("[Trainer] Training started...")
+        print(f"[Trainer] Training started. Epochs: {epochs}, Batch size: {self.batch_size}, Learning rate: {self.optimizer.param_groups[0]['lr']}")
 
         for epoch in tqdm(range(epochs), desc="[Trainer] Epochs", ncols=80):
             total_loss = 0
@@ -66,12 +76,14 @@ class NeuralNetworkTrainer:
 
                 policy = policy / policy.sum(dim=1, keepdim=True).clamp(min=1e-8)
 
+                
 
                 # --- LOSS ---
                 log_probs = F.log_softmax(pred_policy, dim=1)
+                entropy = -(log_probs * torch.exp(log_probs)).sum(dim=1).mean()
                 loss_policy = -(policy * log_probs).sum(dim=1).mean()
                 loss_value = self.value_loss_fn(pred_value, value)
-                loss = loss_policy + loss_value
+                loss = loss_policy + loss_value - 1e-3 * entropy
 
                 self.optimizer.zero_grad()
                 loss.backward()

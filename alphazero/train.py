@@ -7,6 +7,7 @@ Description: Training loop for the engine.
 License: MIT
 """
 
+import os
 import torch
 from evaluator import ModelEvaluator
 from games import (
@@ -21,14 +22,7 @@ from trainer import NeuralNetworkTrainer
 # Ultimate TicTacToe implementation:
 # Uses BATCH_SIZE = 2048,
 # KL_DIVERGENCE loss,
-# LR_SCHEDULE = lr_schedule={
-#            0: 5e-5,
-#            1000: 1e-4,
-#            2000: 2e-4,
-#            3000: 3e-4,
-#            50000: 1e-4,
-#            85000: 3e-5,
-#        },
+# LR_SCHEDULE = 
 #        bnm_schedule={
 #            95000: 0.02,
 #        },
@@ -39,13 +33,34 @@ from trainer import NeuralNetworkTrainer
 # --- Parameters ---
 BOARD_SIZE = 5
 WIN_LENGTH = 4
+
+# TODO: Set a training schedule 
+# 
+# WARMUP PHASE: 
+# SELF PLAY: 100-200
+# EPOCHS: 3-5
+# BATCH SIZE: 1024
+# EVAL: 20 games
+
+# GROWTH PHASE: 
+#
+#
+#
+#
+#
+#
+
+# REFINEMENT PHASE:
+
 NUM_EPISODES = 10
-NUM_SELF_PLAY_GAMES = 100  # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
-NUM_WORKERS = 8  # Adjust based on your CPU cores.
-BATCH_SIZE = 256
-NUM_EPOCHS = 5
-EVALUATION_GAMES = 100
-BUFFER_CAPACITY = 5_000
+NUM_SELF_PLAY_GAMES = 200  # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
+NUM_SIMULATIONS = 200  # Number of MCTS simulations per move.
+NUM_WORKERS = 6  # Adjust based on your CPU cores.
+BATCH_SIZE = 2024
+NUM_EPOCHS = 4 # How many epochs to train on each batch of data? 
+EVALUATION_GAMES = 50
+
+BUFFER_CAPACITY = 20_000
 MODEL_DIR = "models"
 
 
@@ -66,9 +81,13 @@ if __name__ == "__main__":
     ) 
 
     net = promoter.get_best_model() # Load the best model or initialize a new one if no model exists
-    self_play_manager = SelfPlayManager(net, Gomoku)
+    self_play_manager = SelfPlayManager(net, Gomoku, mcts_params={"num_simulations": NUM_SIMULATIONS})
     buffer = ReplayBuffer(capacity=BUFFER_CAPACITY)
-    trainer = NeuralNetworkTrainer(net, device=device)
+
+    if os.path.exists("buffer.pkl"):
+        buffer.load("buffer.pkl")  # Load the replay buffer if it exists
+    
+    trainer = NeuralNetworkTrainer(net, device=device, batch_size=BATCH_SIZE, lr=0.5*1e-4)  # Initialize the trainer
 
     number_of_promotions = 0 
     # Go through the training loop
@@ -93,7 +112,7 @@ if __name__ == "__main__":
        
 
         # ---- Evaluate and promote if better ----
-        best_net = promoter.get_best_model()
+        # best_net = promoter.get_best_model()
         # if models_are_equal(net, best_net):
         #     print("⚠️ Candidate model is identical to the baseline.")
         # else:
@@ -108,6 +127,8 @@ if __name__ == "__main__":
         print("----- Evaluation complete -----")
         # Optional: Print summary
         print(f"[Summary] Win rate: {win_rate:.2%} | Metrics: {metrics}")
+
+        #TODO: plot policy and value entropies, losses, etc.
 
     print(f"[Promoter] Number of promotions during the batch: {number_of_promotions}")
     buffer.save("buffer.pkl")  # Save the replay buffer for future use

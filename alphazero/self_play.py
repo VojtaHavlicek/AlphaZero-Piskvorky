@@ -12,11 +12,6 @@ from monte_carlo_tree_search import MCTS
 from tqdm import tqdm
 from games import O, X, DRAW
 
-# --- Parameters ---
-NUM_EPISODES = 100
-NUM_SELF_PLAY_GAMES = 100
-BATCH_SIZE = 64
-MODEL_DIR = "models"
 
 from collections.abc import Callable
 from queue import Empty
@@ -60,7 +55,7 @@ class SelfPlayManager:
         policy_value_net.load_state_dict(state_dict)
         policy_value_net.eval()
 
-        mcts = MCTS(game_class=self.game_class, net=policy_value_net)
+        mcts = MCTS(game_class=self.game_class, net=policy_value_net, **self.mcts_params)
 
         while True:
             try:
@@ -149,7 +144,7 @@ class SelfPlayManager:
             w.start()
 
         print(
-            f"[SelfPlayManager] Collecting {num_games} games with {num_workers} workers..."
+            f"[SelfPlayManager] Collecting {num_games} games with {num_workers} workers."
         )
 
         results = []
