@@ -16,7 +16,7 @@ import torch
 class ModelPromoter:
     def __init__(self, model_dir, evaluator, net_class, threshold=0.55, device="cpu"):
         self.model_dir = model_dir
-        self.evaluator = evaluator
+        self. evaluator = evaluator
         self.net_class = net_class  # To reinstantiate best model
         self.threshold = threshold
         self.device = device
@@ -26,7 +26,11 @@ class ModelPromoter:
     def get_best_model(self):
         if self.best_path is None:
             print("[Promoter] Choosen a randomly initialized model.")
-            return self.net_class().to(self.device)
+            random_net = self.net_class().to(self.device)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            model_path = os.path.join(self.model_dir, f"model_{timestamp}.pt")
+            torch.save(random_net.state_dict(), model_path)
+            return random_net
         
         print(f"[Promoter] Choosen {self.best_path} for evaluation.")
         model = self.net_class().to(self.device)

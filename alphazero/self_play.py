@@ -8,14 +8,11 @@ License: MIT
 """
 
 import torch
-from monte_carlo_tree_search import MCTS
+from mcts import MCTS
 from tqdm import tqdm
-from games import O, X, DRAW
-
-
+from games import Game, Gomoku, X, O, DRAW
 from collections.abc import Callable
 from queue import Empty
-
 import torch.multiprocessing as mp
 
 
@@ -78,7 +75,11 @@ class SelfPlayManager:
                         add_exploration_noise=True,
                     )
 
-                    state = game_state.encode().squeeze(0)
+                    print(f"[Trainer]: policy {policy}")
+                    
+
+
+                    state = game_state
                     if game_state.current_player not in (X, O):
                         raise ValueError(
                             f"Invalid current player: {game_state.current_player}. Must be 'X' or 'O'."
@@ -88,16 +89,24 @@ class SelfPlayManager:
                    
 
                 winner = game_state.get_winner()
-                #state = game_state.encode().squeeze(0)
 
-                data = [
-                    (
-                        state,
-                        policy,
-                        0 if winner == DRAW else 1 if current_player == winner else -1
-                    )
-                    for state, policy, current_player in history
-                ]  # This is the full selfplay history.
+                data = [] 
+                for state, policy, current_player in history: 
+                    value = 0 if winner == DRAW else 1 if current_player == winner else -1
+
+                    for _ in range():
+                        # Rotate the state and policy
+                        state = state.rot90()
+                        policy = policy.rot90()
+
+                        data.append(
+                            (
+                                state,  # Rotated game state
+                                policy,  # Rotated policy vector
+                                value,  # Value
+                            )
+                        )
+               
 
                 # print(f"Data: \n {data} \n -----------------")
                 result_queue.put(data)
@@ -107,6 +116,24 @@ class SelfPlayManager:
                 break
 
         # Terminated
+
+    def get_symmetric_data(self, play_data):
+        """
+        Args: 
+            Play data: [(state, policy, winner), ...]
+        """
+
+        symmetric_data = []
+        for state, policy, winner in play_data:
+            # Add the original data
+            symmetric_data.append((state, policy, winner))
+
+            # Create a symmetric version of the state
+            for i in range(4):
+                state = state.rot90()
+                policy = policy.rot90()
+
+                symmetric_data.append((state, policy, winner))
 
     def generate_self_play(
         self, 
@@ -149,7 +176,9 @@ class SelfPlayManager:
 
         results = []
         with tqdm(
-            total=num_games, desc="[SelfPlayManager] Self-play", ncols=80
+            total=num_games, 
+            desc="[SelfPlayManager] Self-play", 
+            ncols=80
         ) as pbar:
             for _ in range(num_games):
                 try:

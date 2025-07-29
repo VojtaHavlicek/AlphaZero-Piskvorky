@@ -1,5 +1,5 @@
 import torch
-from monte_carlo_tree_search import MCTS
+from mcts import MCTS
 from tqdm import tqdm
 from games import O, X, DRAW
 
@@ -10,15 +10,20 @@ class ModelEvaluator:
     """
 
     def __init__(
-        self, game_class, mcts_class=None, mcts_params=None, print_games=False
+        self, 
+        game_class, 
+        mcts_class=None, 
+        mcts_params=None, 
+        print_games=False,
+        device=None
     ):
         self.game_class = game_class
-        self.mcts_class = mcts_class if mcts_class is not None else MCTS
         self.mcts_params = mcts_params or {"exploration_strength": 1.0, "num_simulations": 100}
         self.print_games = print_games  # Whether to print game states during evaluation
+        self.device = device if device is not None else torch.device("cpu")
+
 
     def evaluate(self, candidate_net, baseline_net, num_games=20, debug=False):
-        device = next(candidate_net.parameters()).device
         candidate_net.eval()
         baseline_net.eval()
 
@@ -28,20 +33,15 @@ class ModelEvaluator:
 
         for i in tqdm(range(num_games), desc="[Evaluator] Evaluating", ncols=80):
             game = self.game_class()
-            mcts_candidate = self.mcts_class(self.game_class, candidate_net, **self.mcts_params)
-            mcts_baseline = self.mcts_class(self.game_class, baseline_net, **self.mcts_params)
+            mcts_candidate = MCTS(self.game_class, candidate_net, **self.mcts_params)
+            mcts_baseline = MCTS(self.game_class, baseline_net, **self.mcts_params)
+
+            candidate_symbol, baseline_symbol = X, O
 
             if i % 2 == 0:
-                candidate_symbol, baseline_symbol = X, O
-                mcts_candidate = self.mcts_class(self.game_class, candidate_net, **self.mcts_params)
-                mcts_baseline = self.mcts_class(self.game_class, baseline_net, **self.mcts_params)
+                game.current_player = candidate_symbol
             else:
-                candidate_symbol, baseline_symbol = O, X
-                mcts_candidate = self.mcts_class(self.game_class, candidate_net, **self.mcts_params)
-                mcts_baseline = self.mcts_class(self.game_class, baseline_net, **self.mcts_params)
-
-           
-            move_sequence = []
+                game.current_player = baseline_symbol
 
             while not game.is_terminal():
                 if game.current_player == candidate_symbol:
@@ -50,15 +50,11 @@ class ModelEvaluator:
                     mcts = mcts_baseline
                 _, action = mcts.run(game, temperature=0)
 
-                move_sequence.append(action)
                 game = game.apply_action(action)
-                # if debug:
-                #    print(f"[Evaluator] Move {len(move_sequence)}: {action} by {game.current_player}")
-
+                
             if debug:
                 print(game)
             
-
             winner = game.get_winner()
             if winner == candidate_symbol:
                 candidate_wins += 1
@@ -70,13 +66,16 @@ class ModelEvaluator:
                 draws += 1
                 print(f"[Evaluator] Draw! Game {i+1}/{num_games}")
 
-        total = candidate_wins + baseline_wins + draws  # Use 0.5 for draws to balance the win rate calculation
-        win_rate = (
-            (candidate_wins + 0.5*draws) / total
-        )  # Default to 50% if no games were played
-        print(
-            f"[Evaluator]: Candidate Win Rate: {win_rate:.2%} (W:{candidate_wins} L:{baseline_wins} D:{draws})"
-        )
+            total = candidate_wins + baseline_wins + draws  # Use 0.5 for draws to balance the win rate calculation
+            win_rate = (
+                (candidate_wins + 0.5*draws) / total
+            )  # Default to 50% if no games were played
+
+            if debug:
+                print(
+                    f"[Evaluator]: Candidate Win Rate: {win_rate:.2%} (W:{candidate_wins} L:{baseline_wins} D:{draws})"
+                )
+
         return win_rate, {
             "wins": candidate_wins,
             "losses": baseline_wins,

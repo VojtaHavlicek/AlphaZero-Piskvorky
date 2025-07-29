@@ -9,7 +9,7 @@ License: MIT
 
 import torch
 from games import Gomoku, X, O
-from monte_carlo_tree_search import MCTS
+from mcts import MCTS
 from net import GomokuNet
 from promoter import ModelPromoter
 
@@ -18,6 +18,7 @@ GAME_CLASS_NET = GomokuNet
 
 # Question: Human in the loop? 
 # Can I play the model and generate new training data?
+
 
 # "models/best_3x3.pt"
 def human_vs_ai(model_path=None, model=None):
@@ -46,7 +47,7 @@ def human_vs_ai(model_path=None, model=None):
             return
 
     game = GAME_CLASS()
-    mcts = MCTS(game_class=GAME_CLASS, net=net)
+    mcts = MCTS(game_class=GAME_CLASS, net=net, exploration_strength=0)
 
     print(f"You are playing {GAME_CLASS}")
 
@@ -70,7 +71,7 @@ def human_vs_ai(model_path=None, model=None):
             game = game.apply_action(action)
 
     print(game)
-    winner = game.get_winner()
+    winner = game.get_game_result()
     if winner == X:
         print("🎉 You win!")
     elif winner == O:

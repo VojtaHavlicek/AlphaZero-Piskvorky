@@ -9,6 +9,7 @@ License: MIT
 
 import os
 import torch
+from tqdm import tqdm
 from evaluator import ModelEvaluator
 from games import (
     Gomoku,  # NOTE: It may be worth to pakc the recommended ML model into game metadata.
@@ -17,7 +18,7 @@ from net import GomokuNet
 from promoter import ModelPromoter
 from replay_buffer import ReplayBuffer
 from self_play import SelfPlayManager
-from trainer import NeuralNetworkTrainer
+from alphazero.controller import NeuralNetworkController
 
 # Ultimate TicTacToe implementation:
 # Uses BATCH_SIZE = 2048,
@@ -52,15 +53,16 @@ WIN_LENGTH = 4
 
 # REFINEMENT PHASE:
 
-NUM_EPISODES = 10
-NUM_SELF_PLAY_GAMES = 200  # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
-NUM_SIMULATIONS = 200  # Number of MCTS simulations per move.
+NUM_EPISODES = 100
+NUM_SELF_PLAY_GAMES = 500  # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
+NUM_SIMULATIONS = 150  # Number of MCTS simulations per move.
 NUM_WORKERS = 6  # Adjust based on your CPU cores.
-BATCH_SIZE = 2024
+BATCH_SIZE = 2048
 NUM_EPOCHS = 4 # How many epochs to train on each batch of data? 
 EVALUATION_GAMES = 50
-
-BUFFER_CAPACITY = 20_000
+BATCHES_PER_EPISODE = 5 # How many batches to train on each episode (roughly same as the buffer capacity)
+LEARNING_RATE = 1e-4  # Initial learning rate for the optimizer
+BUFFER_CAPACITY = 10_000
 MODEL_DIR = "models"
 
 
@@ -69,7 +71,7 @@ if __name__ == "__main__":
     import torch.multiprocessing as mp
 
     mp.set_start_method("spawn", force=True)
-    device = "cpu" # torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     
 
     # Initialize network, promoter, and replay buffer
@@ -87,8 +89,11 @@ if __name__ == "__main__":
     if os.path.exists("buffer.pkl"):
         buffer.load("buffer.pkl")  # Load the replay buffer if it exists
     
-    trainer = NeuralNetworkTrainer(net, device=device, batch_size=BATCH_SIZE, lr=0.5*1e-4)  # Initialize the trainer
-
+    trainer = NeuralNetworkController(
+        net=net,
+        device=device
+    )
+    
     number_of_promotions = 0 
     # Go through the training loop
     for episode in range(1, NUM_EPISODES + 1):
@@ -105,9 +110,11 @@ if __name__ == "__main__":
         print(f"[Buffer]: samples added, current size: {len(buffer)}")
 
         # ---- Train ----
-        print(f"[Trainer] Training on {BATCH_SIZE} examples...")
-        examples = buffer.sample_batch(BATCH_SIZE)
-        trainer.train(examples, epochs=NUM_EPOCHS)
+        print(f"[Trainer] Starting training with {len(buffer)} examples in the buffer.")
+        for k in range(BATCHES_PER_EPISODE):
+            print(f"[Trainer] {k}/{BATCHES_PER_EPISODE} training episode")
+            examples = buffer.sample_batch(BATCH_SIZE)
+            trainer.train(examples, epochs=NUM_EPOCHS)
         print("[Trainer] Training complete.")
        
 
