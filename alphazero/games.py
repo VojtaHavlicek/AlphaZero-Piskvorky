@@ -164,7 +164,7 @@ class Gomoku():
         return False
     
 
-    def get_game_result(self) -> int:
+    def get_game_result(self) -> str | None:
         """
         Return the result of the game
 

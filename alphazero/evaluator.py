@@ -12,7 +12,6 @@ class ModelEvaluator:
     def __init__(
         self, 
         game_class, 
-        mcts_class=None, 
         mcts_params=None, 
         print_games=False,
         device=None
@@ -66,10 +65,10 @@ class ModelEvaluator:
                 draws += 1
                 print(f"[Evaluator] Draw! Game {i+1}/{num_games}")
 
-            total = candidate_wins + baseline_wins + draws  # Use 0.5 for draws to balance the win rate calculation
+            total = candidate_wins + baseline_wins + draws 
             win_rate = (
                 (candidate_wins + 0.5*draws) / total
-            )  # Default to 50% if no games were played
+            ) 
 
             if debug:
                 print(
