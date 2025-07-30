@@ -30,12 +30,12 @@ class ModelPromoter:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             model_path = os.path.join(self.model_dir, f"model_{timestamp}.pt")
             torch.save(random_net.state_dict(), model_path)
-            return random_net
+            return random_net.to(self.device).float()  # Ensure the model is in float32 format
         
         print(f"[Promoter] Choosen {self.best_path} for evaluation.")
         model = self.net_class().to(self.device)
         model.load_state_dict(torch.load(self.best_path, map_location=self.device))
-        return model
+        return model.to(self.device).float()  # Ensure the model is in float32 format 
 
     def evaluate_and_maybe_promote(
         self, candidate_net, num_games=20, metadata=None, debug=False

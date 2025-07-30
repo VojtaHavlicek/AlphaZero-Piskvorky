@@ -18,7 +18,7 @@ from net import GomokuNet
 from promoter import ModelPromoter
 from replay_buffer import ReplayBuffer
 from self_play import SelfPlayManager
-from alphazero.controller import NeuralNetworkController
+from controller import NeuralNetworkController
 
 # Ultimate TicTacToe implementation:
 # Uses BATCH_SIZE = 2048,
@@ -54,7 +54,7 @@ WIN_LENGTH = 4
 # REFINEMENT PHASE:
 
 NUM_EPISODES = 100
-NUM_SELF_PLAY_GAMES = 500  # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
+NUM_SELF_PLAY_GAMES = 10  # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
 NUM_SIMULATIONS = 150  # Number of MCTS simulations per move.
 NUM_WORKERS = 6  # Adjust based on your CPU cores.
 BATCH_SIZE = 2048
@@ -71,7 +71,7 @@ if __name__ == "__main__":
     import torch.multiprocessing as mp
 
     mp.set_start_method("spawn", force=True)
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    device = "cpu" #torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     
 
     # Initialize network, promoter, and replay buffer
@@ -83,6 +83,7 @@ if __name__ == "__main__":
     ) 
 
     net = promoter.get_best_model() # Load the best model or initialize a new one if no model exists
+   
     self_play_manager = SelfPlayManager(net, Gomoku, mcts_params={"num_simulations": NUM_SIMULATIONS})
     buffer = ReplayBuffer(capacity=BUFFER_CAPACITY)
 

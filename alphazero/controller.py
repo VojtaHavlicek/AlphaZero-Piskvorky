@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import DataLoader, Dataset
 from torch import nn, functional
+import torch.nn.functional as functional
 from tqdm import tqdm
 
 
@@ -28,13 +29,24 @@ class NeuralNetworkController:
     """
     def __init__(self, 
                  net, 
+                 batch_size=2048,
                  device=None):
         
         if device is None:
             device = self._get_gpu()
+
+        if device == "mps":
+            print("[Trainer] Using Apple Silicon GPU (MPS).")
+        elif device == "cuda":
+            print("[Trainer] Using NVIDIA GPU (CUDA).")
+        else:
+            print("[Trainer] Using CPU.")
+      
             
         self.device = device
-        self.net = net.to(device)
+        self.net = net.to(device).float()  # Ensure the model is in float32 format
+        self.batch_size = batch_size
+        self.training_history = []  # Store training history for analysis
 
         self.weight_decay = 1e-4  # Default weight decay for AdamW
 
@@ -86,14 +98,15 @@ class NeuralNetworkController:
         if not isinstance(winner_batch, torch.Tensor):
             winner_batch = torch.tensor(winner_batch, dtype=torch.float32)
 
-        state_batch = state_batch.to(self.device)
-        mcts_probs = mcts_probs.to(self.device)
-        winner_batch = winner_batch.to(self.device)
+        state_batch = state_batch.to(self.device).float()  # Ensure float32 format
+        mcts_probs = mcts_probs.to(self.device).float()  # Ensure float32 format
+        winner_batch = winner_batch.to(self.device).float()  # Ensure float32 format
 
         self.optimizer.zero_grad()
         self.optimizer.param_groups[0]['lr'] = lr
 
         pred_policy_logits, pred_value = self.net(state_batch)
+        
         value_loss = functional.mse_loss(pred_value.view(-1), winner_batch)
         policy_loss = functional.cross_entropy(pred_policy_logits, mcts_probs.argmax(dim=1))
         loss = policy_loss + value_loss
@@ -116,9 +129,9 @@ class NeuralNetworkController:
             total_value_loss = 0
 
             for state, policy, value in dataloader:
-                state = state.to(self.device)
-                policy = policy.to(self.device)
-                value = value.to(self.device)
+                state = state.to(self.device).float()  # Ensure float32 format
+                policy = policy.to(self.device).float()  # Ensure float32 format
+                value = value.to(self.device).float()  # Ensure float32 format
 
                 # Perform a training step
                 loss, entropy = self.train_step(state, policy, value, self.optimizer.param_groups[0]['lr'])
@@ -164,7 +177,7 @@ class NeuralNetworkController:
 
     def load(self, path):
         self.net.load_state_dict(torch.load(path, map_location=self.device))
-        self.net = self.net.to(self.device)
+        self.net = self.net.to(self.device).float()  # Ensure the model is in float32 format
 
     def eval(self):
         self.net.eval()
@@ -181,10 +194,5 @@ class NeuralNetworkController:
                 if torch.cuda.is_available()
                 else "cpu"
             )
-        if device.type == "mps":
-            print("[Trainer] Using Apple Silicon GPU (MPS).")
-        elif device.type == "cuda":
-            print("[Trainer] Using NVIDIA GPU (CUDA).")
-        else:
-            print("[Trainer] Using CPU.")
+        
         return device

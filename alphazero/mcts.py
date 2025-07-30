@@ -18,261 +18,143 @@ DEFAULT_NUM_SIMULATIONS = 10_000  # Default number of simulations per move
 DEFAULT_EXPLORATION_STRENGTH = 5  # Default exploration strength for UCB
 
 
+# --- MCTS Node ---
 class Node:
-    """
-    Represents a node in the MCTS tree.
-    """
-
-    def __init__(self, 
-                 state: Gomoku, 
-                 parent=None, 
-                 prior=1.0):
-        
+    def __init__(self, state, parent=None, prior=1.0):
+        self.state = state            # Game state
         self.parent = parent
-        self.state = state
-        self.prior = prior  # NOTE: This is the prior probability of choosing this node in the UCB formula
-        self.children = {}  # Action -> Node mapping 
+        self.prior = prior            # Policy prior (P)
+        self.children = {}            # action -> Node
+        self.N = 0                    # Visit count
+        self.W = 0.0                  # Total value
+        self.Q = 0.0                  # Mean value
 
-        self.N = 0  # Visit count
-        self.W = 0.0  # Upper confidence bound (UCB) value
-        self.Q = 0.0  # Q value estimate (mean value)
+    def is_leaf(self):
+        return len(self.children) == 0
 
-    def is_expanded(self) -> bool:
-        return bool(self.children)
-    
-
-    def expand(self, policy_dict):
-        """
-        Expands the node by creating child nodes for each legal action.
-        This method uses the provided policy priors to set the prior probabilities for each child node.
-        This is the prior probability of choosing this node in the UCB formula.
-
-        Args:
-            policy_priors: List[float]: A list of prior probabilities for each legal action.
-        """
-        for action, probability in policy_dict.items(): 
+    def expand(self, policy, legal_actions):
+        """Expand node using policy distribution and legal actions."""
+        for action in legal_actions:
             if action not in self.children:
                 self.children[action] = Node(
-                    game_state=self.state.apply_action(action),
+                    state=self.state.apply_action(action),
                     parent=self,
-                    prior=probability,
+                    prior=float(policy[action[0], action[1]])
                 )
-    
-    def select(self, exploration_strength):
-        """
-        Selects a child node based on the UCB score.
 
-        Args:
-            c_puct: float: Exploration strength parameter for UCB.
-        """
-        return max(self.children.items(), 
-                   key=lambda action_node: action_node[1].get_value(exploration_strength))
-    
+    def select(self, c_puct):
+        """Select child with max Q + U (PUCT)."""
+        return max(
+            self.children.items(),
+            key=lambda item: item[1].Q + c_puct * item[1].prior * np.sqrt(self.N + 1e-8) / (1 + item[1].N)
+        )
 
-    def update(self, value):
-        """
-        Updates the node with a new value.
-
-        Args:
-            value: float: The value to update the node with.
-        """
+    def backup(self, value):
+        """Backup value through the path, alternating signs."""
         self.N += 1
-        self.Q += 1.0*(value - self.Q) / self.N  # Incremental mean update
+        self.W += value
+        self.Q = self.W / self.N
+        if self.parent:
+            self.parent.backup(-value)
 
 
-    def update_recursive(self, value):
-        """
-        Updates the node and propagates the value up to the parent nodes.
-
-        Args:
-            value: float: The value to update the node with.
-        """
-        if self.parent is not None:
-            self.parent.update_recursive(-value)
-        self.update(value)
-    
-    
-    def get_value(self, exploration_strength):
-        """
-        Computes the UCB value for this node.
-
-        Args:
-            c_puct: (float) Exploration strength parameter for UCB.
-
-        Returns:
-            float: The UCB value for this node.
-        """
-        self.W = (exploration_strength * self.prior * (self.N**0.5)) / (1 + self.N)
-        return self.Q + self.W
-    
-    def is_leaf(self): 
-        return self.children == {}
-    
-    def is_root(self):
-        return self.parent is None
-
-
-def softmax(x):
-    probs = np.exp(x - np.max(x))
-    probs /= np.sum(probs)
-    return probs
-    
-
+# --- MCTS Core ---
 class MCTS:
-    def __init__(
-        self,
-        game_class: Gomoku,
-        policy_value_fn, # Function to get policy and value. policy is a 2D array of (board_size, board_size) shape, value is a scalar.
-        exploration_strength=DEFAULT_EXPLORATION_STRENGTH,
-        num_simulations=DEFAULT_NUM_SIMULATIONS,
-        cache_size=DEFAULT_CACHE_SIZE
-    ):
-        self.game_class = game_class  # Type of the game, e.g., TicTacToe
-        self.policy_value_fn = policy_value_fn  # Function to get policy and value. Usually a neural network.
-        self.exploration_strength = (
-            exploration_strength  # Strength of exploration in UCB formula
-        )
-        self.num_playouts = num_simulations  # Number of simulations to run per move
-        self.cache_size = cache_size  # Maximum size of the evaluation cache
+    def __init__(self, net, num_simulations=1000, c_puct=1.0,
+                 dirichlet_alpha=0.3, dirichlet_weight=0.25):
+        self.net = net
+        self.device = net.device if hasattr(net, 'device') else torch.device('cpu')
+        self.num_simulations = num_simulations
+        self.c_puct = c_puct
+        self.dirichlet_alpha = dirichlet_alpha
+        self.dirichlet_weight = dirichlet_weight
 
-        self.evaluation_cache = self._init_cache()
-        print(f"[MCTS] exploration strength: {exploration_strength}, num_simulations: {num_simulations}")
+        print(f"[MCTS] Initialized with {num_simulations} simulations, c_puct={c_puct}")
 
-        self.root = Node(None, 1.0) # Initialize root node with a dummy state and prior of 1.0
+    def run(self,
+            root_state, 
+            temperature=1.0, 
+            add_root_noise=False):
+        
+        root = Node(state=root_state)
 
+        # --- Evaluate root ---
+        with torch.no_grad():
+            logits, value = self.net(root_state.encode(self.device).unsqueeze(0))
+            policy = torch.softmax(logits.squeeze(0), dim=0).cpu().numpy().reshape(
+                root_state.board_size, 
+                root_state.board_size
+            )
+            value = float(value.item())
 
-    def _get_policy_dict(self, policy):
-        """
-        Converts a policy (2D array) into a dictionary mapping actions to probabilities.
+        legal_actions = root_state.get_legal_actions()
+        policy_masked = np.zeros_like(policy)
+        for r, c in legal_actions:
+            policy_masked[r, c] = policy[r, c]
+        policy_masked /= policy_masked.sum() + 1e-8
 
-        Args:
-            policy (_type_): _description_
+        # Add exploration noise
+        if add_root_noise:
+            noise = np.random.dirichlet([self.dirichlet_alpha] * len(legal_actions))
+            for (r, c), n in zip(legal_actions, noise):
+                policy_masked[r, c] = (1 - self.dirichlet_weight) * policy_masked[r, c] + self.dirichlet_weight * n
+            policy_masked /= policy_masked.sum()
 
-        Returns:
-            _type_: _description_
-        """
-        policy_dict = {}
-        for row in len(policy):
-            for col in len(policy[row]):
-                action = (row, col)
-                policy_dict[action] = policy[row][col]
-        return policy_dict
+        root.expand(policy_masked, legal_actions)
 
+        # --- Run simulations ---
+        for _ in range(self.num_simulations):
+            node, state = root, root_state.clone()
 
-    def _playout(self, state:Gomoku):
-        """
-        Runs a playout from the given game state to a terminal state.
-        This method is used to simulate the outcome of a game from a given state.
+            # Selection
+            while not node.is_leaf() and not state.is_terminal():
+                action, node = node.select(self.c_puct)
+                state = state.apply_action(action)
 
-        Args:
-            state (Game): The current game state to simulate from.
-
-        Returns:
-            float: The value of the terminal state from the perspective of the current player.
-        """
-        node = self.root 
-
-        while not node.is_leaf():
-            action, node = node.select(self.exploration_strength)
-            state = state.apply_action(action)
-
-        policy, leaf_value = self.policy_value_fn(state) # Eval policy and value from the supplied policy-value function
-        policy_dict = self._get_policy_dict(policy) # Convert policy to dictionary
-
-        game_result = state.get_game_result()
-
-        if game_result is None:
-            node.expand(policy_dict)
-        else:
-            if game_result == DRAW:
-                leaf_value = 0.0
-            elif game_result == state.current_player:
-                leaf_value = 1.0
+            # Evaluate leaf
+            if state.is_terminal():
+                result = state.get_game_result()
+                value = 0 if result == DRAW else (1 if result == state.current_player else -1)
             else:
-                leaf_value = -1.0
-          
-        node.update_recursive(-leaf_value)  # Backpropagate the value up the tree
+                with torch.no_grad():
+                    logits, value_tensor = self.net(state.encode(self.device).unsqueeze(0))
+                    policy = torch.softmax(logits.squeeze(0), dim=0).cpu().numpy().reshape(
+                        state.board_size, 
+                        state.board_size
+                    )
+                    value = float(value_tensor.item())
 
+                legal_actions = state.get_legal_actions()
+                policy_masked = np.zeros_like(policy)
 
-    def get_move_probabilities(self, 
-                               state:Gomoku, 
-                               temperature=1e-3):
-        for _ in range(self.num_playouts):
-            state = state.clone()  # Clone the state to avoid modifying the original
-            self._playout(state)
+                for r, c in legal_actions:
+                    policy_masked[r, c] = policy[r, c]
+                policy_masked /= policy_masked.sum() + 1e-8
 
-        # NOTE: Why is this computed from visits? 
+                node.expand(policy_masked, legal_actions)
 
-        actions_and_visits = [(action, node.N) for action, node in self.root.children.items()]
-        actions, visits = zip(*actions_and_visits, strict=True)  # Unzip actions and visits
-        action_probabilities = softmax(1.0/temperature * np.log(np.array(visits) + 1e-10))  # Add small value to avoid log(0)
+            # Backup
+            node.backup(-value)
 
-        return actions, action_probabilities
-    
+        # --- Compute action probabilities ---
+        visit_counts = np.array([child.N for child in root.children.values()], dtype=np.float32)
+        actions = list(root.children.keys())
 
-    def update_with_move(self, 
-                         last_move):
-        """
-        Moves down the tree to the node corresponding to the last move made in the game.
-
-        Args:
-            last_move (_type_): _description_
-        """
-        if last_move in self.root.children:
-            self.root = self.root.children[last_move]
-            self.root.parent = None  # Reset parent to None for the new root
+        # One hot policy vector:
+        if temperature == 0:
+            best_action = actions[np.argmax(visit_counts)]
+            pi = np.zeros(root_state.board_size**2, dtype=np.float32)
+            idx = best_action[0] * root_state.board_size + best_action[1]
+            pi[idx] = 1.0
         else:
-            self.root = Node(None, 1.0)
+            log_counts = np.log(visit_counts + 1e-8) / temperature
+            log_counts -= np.max(log_counts)
+            counts_temp = np.exp(log_counts)
+            probs = counts_temp / counts_temp.sum()
 
-class MCTSPlayer:
-    def __init__(self, 
-                 game_class,
-                 policy_value_fn,
-                 exploration_strength=DEFAULT_EXPLORATION_STRENGTH,
-                 num_simulations=DEFAULT_NUM_SIMULATIONS,
-                 is_selfplay=False): 
-        
-        self.mcts = MCTS(
-            game_class=game_class,
-            policy_value_fn=policy_value_fn,
-            exploration_strength=exploration_strength,
-            num_simulations=num_simulations
-        )
+            pi = np.zeros(root_state.board_size**2, dtype=np.float32)
+            for (r, c), p in zip(actions, probs):
+                pi[r * root_state.board_size + c] = p
+            best_action = actions[np.random.choice(len(actions), p=probs)]
 
-        self.is_selfplay = is_selfplay
-
-
-    def get_action(self,
-                   state:Gomoku, 
-                   temperature=1e-3):
-        """
-        Get the action to take in the current state using MCTS.
-
-        TODO: add an option to return the action probabilities.
-        Args:
-            state (Game): The current game state.
-            temperature (float): Temperature parameter for action selection.
-
-        Returns:
-            tuple: The selected action and its probability.
-        """
-        actions, action_probabilities = self.mcts.get_move_probabilities(state, temperature)
-        
-        if self.is_selfplay:
-            move = np.random.choice(actions, p=0.75*action_probabilities + 0.25*np.random.dirichlet(np.ones(len(actions))))
-            self.mcts.update_with_move(move)
-        else:
-            move = np.random.choice(actions, p=action_probabilities)
-            self.mcts.update_with_move(-1)  # Reset the root node after each move in non-selfplay mode
-
-        return move
-
-
-
-    
-
-
-            
-
-
-    
+        return torch.tensor(pi, dtype=torch.float32), best_action

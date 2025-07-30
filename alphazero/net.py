@@ -24,8 +24,9 @@ class GomokuNet(nn.Module):
         nn (_type_): _description_
     """
 
-    def __init__(self, board_size=5):
+    def __init__(self, board_size=5, device=None):
         super().__init__()
+        self.device = device if device else torch.device("cpu")
         self.board_size = board_size  # Size of the Gomoku board (e.g., 5 for 5x5 Gomoku)
 
         # Using architecture from junxiaosong's implementation of AlphaZero for Gomoku.

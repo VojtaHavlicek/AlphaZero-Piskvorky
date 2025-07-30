@@ -17,7 +17,7 @@ class ModelEvaluator:
         device=None
     ):
         self.game_class = game_class
-        self.mcts_params = mcts_params or {"exploration_strength": 1.0, "num_simulations": 100}
+        self.mcts_params = mcts_params or {"c_puct": 1.0}
         self.print_games = print_games  # Whether to print game states during evaluation
         self.device = device if device is not None else torch.device("cpu")
 

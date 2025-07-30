@@ -22,7 +22,9 @@ DRAW = "D"
 # --- Gomoku ---
 class Gomoku():
     def __init__(self, board_size=5, win_length=4):
-        super().__init__(board_size)
+        self.board_size = board_size
+        self.board = [[None for _ in range(board_size)] for _ in range(board_size)]
+        self.current_player = X
         self.win_length = win_length
         self.winner = None # TODO: Use string instead 
         self.last_action = None  # Store the last move for the opponent
@@ -122,10 +124,7 @@ class Gomoku():
             encoded[2, r, c] = 1.0
 
         # MARK: Fourth channel is empty for now, can be used for additional information
-        return encoded.view(
-            1, 4, self.board_size, self.board_size
-        )  # PyTorch expects [1, C, H, W] format for CNNs
-    
+        return encoded
 
     # MARK: Get game results 
     def is_terminal(self) -> bool:
