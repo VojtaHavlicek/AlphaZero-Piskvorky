@@ -2,6 +2,8 @@ import torch
 from mcts import MCTS
 from tqdm import tqdm
 from games import O, X, DRAW
+from controller import NeuralNetworkController, make_policy_value_fn
+from train import EVAL_EXPLORATION_CONSTANT, EVALUATION_GAMES, EVAL_TEMPERATURE, NUM_EVAL_SIMULATIONS
 
 
 class ModelEvaluator:
@@ -12,19 +14,21 @@ class ModelEvaluator:
     def __init__(
         self, 
         game_class, 
-        mcts_params=None, 
-        print_games=False,
-        device=None
+        print_games,
+        device
     ):
         self.game_class = game_class
-        self.mcts_params = mcts_params or {"c_puct": 1.0}
         self.print_games = print_games  # Whether to print game states during evaluation
         self.device = device if device is not None else torch.device("cpu")
 
 
-    def evaluate(self, candidate_net, baseline_net, num_games=20, debug=False):
-        candidate_net.eval()
-        baseline_net.eval()
+    def evaluate(self, 
+                 candidate_controller:NeuralNetworkController, 
+                 baseline_controller:NeuralNetworkController, 
+                 num_games=20, 
+                 debug=False):
+        candidate_controller.net.eval()
+        baseline_controller.net.eval()
 
         candidate_wins = 0
         baseline_wins = 0
@@ -32,8 +36,21 @@ class ModelEvaluator:
 
         for i in tqdm(range(num_games), desc="[Evaluator] Evaluating", ncols=80):
             game = self.game_class()
-            mcts_candidate = MCTS(self.game_class, candidate_net, **self.mcts_params)
-            mcts_baseline = MCTS(self.game_class, baseline_net, **self.mcts_params)
+            
+            candidate_policy_value_fn = make_policy_value_fn(candidate_controller)
+            baseline_policy_value_fn = make_policy_value_fn(baseline_controller)
+
+            mcts_candidate = MCTS(candidate_policy_value_fn, 
+                                  num_simulations=NUM_EVAL_SIMULATIONS,
+                                  c_puct=EVAL_EXPLORATION_CONSTANT,
+                                  dirichlet_alpha=0.0, 
+                                  dirichlet_weight=0.0)
+            
+            mcts_baseline = MCTS(baseline_policy_value_fn,
+                                  num_simulations=NUM_EVAL_SIMULATIONS,
+                                  c_puct=EVAL_EXPLORATION_CONSTANT,
+                                  dirichlet_alpha=0.0, 
+                                  dirichlet_weight=0.0)
 
             candidate_symbol, baseline_symbol = X, O
 
@@ -47,6 +64,7 @@ class ModelEvaluator:
                     mcts = mcts_candidate
                 else:
                     mcts = mcts_baseline
+
                 _, action = mcts.run(game, temperature=0)
 
                 game = game.apply_action(action)
@@ -54,11 +72,11 @@ class ModelEvaluator:
             if debug:
                 print(game)
             
-            winner = game.get_winner()
-            if winner == candidate_symbol:
+            result = game.get_game_result()
+            if result == candidate_symbol:
                 candidate_wins += 1
                 print(f"[Evaluator] Candidate wins! Game {i+1}/{num_games}")
-            elif winner == baseline_symbol:
+            elif result == baseline_symbol:
                 baseline_wins += 1
                 print(f"[Evaluator] Baseline wins! Game {i+1}/{num_games}")
             else:

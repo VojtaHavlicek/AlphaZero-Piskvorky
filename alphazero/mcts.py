@@ -27,7 +27,7 @@ class Node:
         self.children = {}            # action -> Node
         self.N = 0                    # Visit count
         self.W = 0.0                  # Total value
-        self.Q = 0.0                  # Mean value
+        self.Q = 0.0                  # Mean value. Estimated Q-value of the node.
 
     def is_leaf(self):
         return len(self.children) == 0
@@ -60,47 +60,40 @@ class Node:
 
 # --- MCTS Core ---
 class MCTS:
-    def __init__(self, net, num_simulations=1000, c_puct=1.0,
-                 dirichlet_alpha=0.3, dirichlet_weight=0.25):
-        self.net = net
-        self.device = net.device if hasattr(net, 'device') else torch.device('cpu')
+    def __init__(self, 
+                 policy_value_fn, # Policy and value function, e.g. a neural network. Maps GameState to (policy, value).
+                 num_simulations, 
+                 c_puct,
+                 dirichlet_alpha=0.3, 
+                 dirichlet_weight=0.25):
+        self.policy_value_fn = policy_value_fn  # Neural network or policy-value function
         self.num_simulations = num_simulations
         self.c_puct = c_puct
         self.dirichlet_alpha = dirichlet_alpha
         self.dirichlet_weight = dirichlet_weight
 
-        print(f"[MCTS] Initialized with {num_simulations} simulations, c_puct={c_puct}")
+        # print(f"[MCTS] Initialized with {num_simulations} simulations, c_puct={c_puct}")
 
     def run(self,
             root_state, 
-            temperature=1.0, 
-            add_root_noise=False):
-        
+            temperature, 
+            add_root_noise=False) -> tuple[np.ndarray, tuple[int, int]]:
+      
         root = Node(state=root_state)
 
         # --- Evaluate root ---
-        with torch.no_grad():
-            logits, value = self.net(root_state.encode(self.device).unsqueeze(0))
-            policy = torch.softmax(logits.squeeze(0), dim=0).cpu().numpy().reshape(
-                root_state.board_size, 
-                root_state.board_size
-            )
-            value = float(value.item())
-
+        policy, value = self.policy_value_fn(root_state)  # <--- 
         legal_actions = root_state.get_legal_actions()
-        policy_masked = np.zeros_like(policy)
-        for r, c in legal_actions:
-            policy_masked[r, c] = policy[r, c]
-        policy_masked /= policy_masked.sum() + 1e-8
 
         # Add exploration noise
         if add_root_noise:
             noise = np.random.dirichlet([self.dirichlet_alpha] * len(legal_actions))
-            for (r, c), n in zip(legal_actions, noise):
-                policy_masked[r, c] = (1 - self.dirichlet_weight) * policy_masked[r, c] + self.dirichlet_weight * n
-            policy_masked /= policy_masked.sum()
+            for (r, c), n in zip(legal_actions, noise, strict=True):
+                policy[r, c] = (1 - self.dirichlet_weight) * policy[r, c] + self.dirichlet_weight * n
+            
+            # NOTE: clip this potentailly 
 
-        root.expand(policy_masked, legal_actions)
+        root.expand(policy, legal_actions)
 
         # --- Run simulations ---
         for _ in range(self.num_simulations):
@@ -116,22 +109,9 @@ class MCTS:
                 result = state.get_game_result()
                 value = 0 if result == DRAW else (1 if result == state.current_player else -1)
             else:
-                with torch.no_grad():
-                    logits, value_tensor = self.net(state.encode(self.device).unsqueeze(0))
-                    policy = torch.softmax(logits.squeeze(0), dim=0).cpu().numpy().reshape(
-                        state.board_size, 
-                        state.board_size
-                    )
-                    value = float(value_tensor.item())
-
                 legal_actions = state.get_legal_actions()
-                policy_masked = np.zeros_like(policy)
-
-                for r, c in legal_actions:
-                    policy_masked[r, c] = policy[r, c]
-                policy_masked /= policy_masked.sum() + 1e-8
-
-                node.expand(policy_masked, legal_actions)
+                policy, value = self.policy_value_fn(state)
+                node.expand(policy, legal_actions)
 
             # Backup
             node.backup(-value)
@@ -140,21 +120,34 @@ class MCTS:
         visit_counts = np.array([child.N for child in root.children.values()], dtype=np.float32)
         actions = list(root.children.keys())
 
-        # One hot policy vector:
+        # Policy vector
+        pi = np.zeros(root_state.board_size**2, dtype=np.float32)
+
+        if len(actions) == 0:
+            return torch.tensor(pi, dtype=torch.float32), None
+        
         if temperature == 0:
             best_action = actions[np.argmax(visit_counts)]
-            pi = np.zeros(root_state.board_size**2, dtype=np.float32)
             idx = best_action[0] * root_state.board_size + best_action[1]
             pi[idx] = 1.0
         else:
+            # Softmax over visit counts (policy improvement)
+            # Apply temperature scaling 
             log_counts = np.log(visit_counts + 1e-8) / temperature
             log_counts -= np.max(log_counts)
-            counts_temp = np.exp(log_counts)
-            probs = counts_temp / counts_temp.sum()
+            probs = np.exp(log_counts)
+            probs_sum = probs.sum()
 
-            pi = np.zeros(root_state.board_size**2, dtype=np.float32)
-            for (r, c), p in zip(actions, probs):
-                pi[r * root_state.board_size + c] = p
+            # Numerical errors or zero probabilities -> uniform distribution
+            if probs_sum < 1e-8 or np.isnan(probs_sum):
+                probs = np.ones_like(probs)/len(probs)
+            else:
+                probs /= probs_sum
+
+            for (r,c), prob in zip(actions, probs, strict=True):
+                idx = r * root_state.board_size + c
+                pi[idx] = prob
+
             best_action = actions[np.random.choice(len(actions), p=probs)]
 
-        return torch.tensor(pi, dtype=torch.float32), best_action
+        return pi, best_action

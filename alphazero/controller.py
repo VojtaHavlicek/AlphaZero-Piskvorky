@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader, Dataset
 from torch import nn, functional
 import torch.nn.functional as functional
 from tqdm import tqdm
+from games import Gomoku  # Assuming Gomoku is defined in games.py
 
 
 class AlphaZeroDataset(Dataset):
@@ -16,11 +17,33 @@ class AlphaZeroDataset(Dataset):
         state, policy, value = self.examples[idx]
         return (
             state.float(),
-            policy.float(),
+            policy,
             torch.tensor(value, dtype=torch.float32)
             if not torch.is_tensor(value)
             else value.float(),
         )
+    
+def make_policy_value_fn(controller):
+    """
+    Returns a callable policy_value_fn(state) -> (policy, value)
+    that works on a single game state.
+    """
+
+    def policy_value_fn(state):
+        # Encode single state into a tensor
+        if isinstance(state, Gomoku):
+            state_tensor = state.encode(controller.device).unsqueeze(0)  # [1, C, H, W]
+
+        with torch.no_grad():
+            policy_logits, value = controller.net(state_tensor)
+            # Convert to 2D policy map
+            board_size = state.board_size
+            policy = torch.softmax(policy_logits[0], dim=0).cpu().numpy().reshape(board_size, board_size)
+            value = float(value.item())
+
+        return policy, value
+
+    return policy_value_fn
 
 
 class NeuralNetworkController:
@@ -29,19 +52,11 @@ class NeuralNetworkController:
     """
     def __init__(self, 
                  net, 
-                 batch_size=2048,
-                 device=None):
+                 device,
+                 batch_size=2048):
         
-        if device is None:
-            device = self._get_gpu()
-
-        if device == "mps":
-            print("[Trainer] Using Apple Silicon GPU (MPS).")
-        elif device == "cuda":
-            print("[Trainer] Using NVIDIA GPU (CUDA).")
-        else:
-            print("[Trainer] Using CPU.")
-      
+        print(f"[Controller] Initializing NeuralNetworkController with device: {device}, batch_size: {batch_size}")
+       
             
         self.device = device
         self.net = net.to(device).float()  # Ensure the model is in float32 format
@@ -71,6 +86,14 @@ class NeuralNetworkController:
         with torch.no_grad():
             pred_policy_logits, pred_value = self.net(state_batch)
             pred_policy = torch.softmax(pred_policy_logits, dim=1)
+
+        #with torch.no_grad():
+        #           logits, value_tensor = self.net(state.encode(self.device).unsqueeze(0))
+        #            policy = torch.softmax(logits.squeeze(0), dim=0).cpu().numpy().reshape(
+        #                state.board_size, 
+        #                state.board_size
+        #            )
+        #            value = float(value_tensor.item())
         
         return pred_policy.cpu().numpy(), pred_value.cpu().numpy()
 
@@ -121,9 +144,9 @@ class NeuralNetworkController:
         dataloader = self._prepare_data(examples)
         self.net.train()
 
-        print(f"[Trainer] Training started. Epochs: {epochs}, Batch size: {self.batch_size}, Learning rate: {self.optimizer.param_groups[0]['lr']}")
+        print(f"[Controller] Training started. Epochs: {epochs}, Batch size: {self.batch_size}, Learning rate: {self.optimizer.param_groups[0]['lr']}")
 
-        for epoch in tqdm(range(epochs), desc="[Trainer] Epochs", ncols=80):
+        for epoch in tqdm(range(epochs), desc="[Controller] Epochs", ncols=80):
             total_loss = 0
             total_policy_loss = 0
             total_value_loss = 0
@@ -148,7 +171,7 @@ class NeuralNetworkController:
             total_loss /= len(dataloader)
             total_policy_loss /= len(dataloader)
 
-            print(f"[Trainer] Epoch {epoch + 1}/{epochs}. Loss: {total_loss:.4f}, Policy Loss: {total_policy_loss:.4f}")
+            print(f"[Controller] Epoch {epoch + 1}/{epochs}. Loss: {total_loss:.4f}, Policy Loss: {total_policy_loss:.4f}")
             self.training_history.append(
                 {
                     "loss": total_loss,
@@ -163,7 +186,7 @@ class NeuralNetworkController:
                 )
 
         print(
-            f"[Trainer] Training finished. Loss: {total_loss:.4f}, Policy Loss: {total_policy_loss:.4f}, Value Loss: {total_value_loss:.4f}"
+            f"[Controller] Training finished. Loss: {total_loss:.4f}, Policy Loss: {total_policy_loss:.4f}, Value Loss: {total_value_loss:.4f}"
         )
 
 
@@ -185,14 +208,4 @@ class NeuralNetworkController:
     def train_mode(self):
         self.net.train()
 
-    #MARK: Helper functions
-    def _get_gpu(self):
-        device = torch.device(
-                "mps"
-                if torch.backends.mps.is_available()
-                else "cuda"
-                if torch.cuda.is_available()
-                else "cpu"
-            )
-        
-        return device
+   

@@ -70,7 +70,6 @@ class ReplayBuffer:
             print(f"[ReplayBuffer:] Loading replay buffer from {filename}...")
             self.buffer = deque(pickle.load(f), maxlen=self.buffer.maxlen)
 
-    
 
     def __len__(self) -> int:
         return len(self.buffer)

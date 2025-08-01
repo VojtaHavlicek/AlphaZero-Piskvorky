@@ -54,16 +54,31 @@ WIN_LENGTH = 4
 # REFINEMENT PHASE:
 
 NUM_EPISODES = 100
+NUM_WORKERS = 4  # Adjust based on your CPU cores.
+
+# ---- SELF-PLAY PARAMETERS ----
 NUM_SELF_PLAY_GAMES = 10  # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
-NUM_SIMULATIONS = 150  # Number of MCTS simulations per move.
-NUM_WORKERS = 6  # Adjust based on your CPU cores.
-BATCH_SIZE = 2048
-NUM_EPOCHS = 4 # How many epochs to train on each batch of data? 
-EVALUATION_GAMES = 50
-BATCHES_PER_EPISODE = 5 # How many batches to train on each episode (roughly same as the buffer capacity)
-LEARNING_RATE = 1e-4  # Initial learning rate for the optimizer
+NUM_SELF_PLAY_SIMULATIONS = 150  # Number of MCTS simulations per move.
+SELF_PLAY_EXPLORATION_CONSTANT = 5.0  # Exploration constant for MCTS
 BUFFER_CAPACITY = 10_000
+
+# ---- TRAINING PARAMETERS ----
+BATCH_SIZE = 2048
+BATCHES_PER_EPISODE = 5 # How many batches to train on each episode (roughly same as the buffer capacity)
+NUM_EPOCHS = 3 # How many epochs to train on each batch of data? 
+LEARNING_RATE = 1e-4  # Initial learning rate for the optimizer
 MODEL_DIR = "models"
+
+# ---- EVAL PARAMETERS ----
+EVALUATION_GAMES = 50
+NUM_EVAL_SIMULATIONS = 100  # Number of MCTS simulations for evaluation
+EVAL_EXPLORATION_CONSTANT = 1.0  # Exploration constant for MCTS during evaluation
+EVAL_TEMPERATURE = 0.0  # Temperature for evaluation (lower means more greedy)
+
+
+
+
+
 
 
 if __name__ == "__main__":
@@ -71,29 +86,43 @@ if __name__ == "__main__":
     import torch.multiprocessing as mp
 
     mp.set_start_method("spawn", force=True)
-    device = "cpu" #torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    print(f"[Main] Using {device}")
     
 
     # Initialize network, promoter, and replay buffer
-    evaluator = ModelEvaluator(Gomoku)
+    evaluator = ModelEvaluator(Gomoku,
+                               mcts_params={"num_simulations": NUM_EVAL_SIMULATIONS, 
+                                            "c_puct": EVAL_EXPLORATION_CONSTANT},
+        print_games=False,  # Set to True to print game states during evaluation
+        device=device
+    )
+    
     promoter = ModelPromoter(
         model_dir=MODEL_DIR, 
         evaluator=evaluator, 
-        net_class=GomokuNet
+        net_class=GomokuNet,
+        device=device
     ) 
 
     net = promoter.get_best_model() # Load the best model or initialize a new one if no model exists
    
-    self_play_manager = SelfPlayManager(net, Gomoku, mcts_params={"num_simulations": NUM_SIMULATIONS})
+    controller = NeuralNetworkController(
+        net=net,
+        device=device
+    )
+   
+    self_play_manager = SelfPlayManager(controller, 
+                                        device=device,
+                                        mcts_params={"num_simulations": NUM_SELF_PLAY_SIMULATIONS,
+                                                     "c_puct": SELF_PLAY_EXPLORATION_CONSTANT})
+   
     buffer = ReplayBuffer(capacity=BUFFER_CAPACITY)
 
     if os.path.exists("buffer.pkl"):
         buffer.load("buffer.pkl")  # Load the replay buffer if it exists
     
-    trainer = NeuralNetworkController(
-        net=net,
-        device=device
-    )
+    
     
     number_of_promotions = 0 
     # Go through the training loop
@@ -105,8 +134,8 @@ if __name__ == "__main__":
             num_games=NUM_SELF_PLAY_GAMES,
             num_workers=NUM_WORKERS,  # Adjust number of workers based on your CPU cores
         )
+        print(f"[SelfPlayManager] Generated {len(data)} self-play examples.")
 
-        print(f"[Buffer]: size: {len(buffer)}")
         buffer.add(data)  # Add data to the replay buffer
         print(f"[Buffer]: samples added, current size: {len(buffer)}")
 
@@ -115,7 +144,7 @@ if __name__ == "__main__":
         for k in range(BATCHES_PER_EPISODE):
             print(f"[Trainer] {k}/{BATCHES_PER_EPISODE} training episode")
             examples = buffer.sample_batch(BATCH_SIZE)
-            trainer.train(examples, epochs=NUM_EPOCHS)
+            controller.train(examples, epochs=NUM_EPOCHS)
         print("[Trainer] Training complete.")
        
 
@@ -126,7 +155,10 @@ if __name__ == "__main__":
         # else:
         #     print("✅ Models differ — evaluation makes sense.")
         win_rate, metrics, was_promoted = promoter.evaluate_and_maybe_promote(
-            net, num_games=EVALUATION_GAMES, metadata={"episode": episode}, debug=True
+            controller, 
+            num_games=EVALUATION_GAMES, 
+            metadata={"episode": episode}, 
+            debug=True
         )
         if was_promoted:
             number_of_promotions += 1

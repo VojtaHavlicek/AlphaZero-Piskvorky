@@ -9,12 +9,13 @@ License: MIT
 
 import os
 from datetime import datetime
+from controller import NeuralNetworkController
 
 import torch
 
 
 class ModelPromoter:
-    def __init__(self, model_dir, evaluator, net_class, threshold=0.55, device="cpu"):
+    def __init__(self, model_dir, evaluator, net_class, device, threshold=0.55):
         self.model_dir = model_dir
         self. evaluator = evaluator
         self.net_class = net_class  # To reinstantiate best model
@@ -38,11 +39,19 @@ class ModelPromoter:
         return model.to(self.device).float()  # Ensure the model is in float32 format 
 
     def evaluate_and_maybe_promote(
-        self, candidate_net, num_games=20, metadata=None, debug=False
+        self, 
+        candidate_controller:NeuralNetworkController, 
+        num_games=20, 
+        metadata=None, 
+        debug=False
     ):
-        base_net = self.get_best_model()
+        baseline_net = self.get_best_model()
+        baseline_controller = NeuralNetworkController(baseline_net, device=self.device)
         win_rate, metrics = self.evaluator.evaluate(
-            candidate_net, base_net, num_games=num_games, debug=debug
+            candidate_controller, 
+            baseline_controller, 
+            num_games=num_games, 
+            debug=debug
         )
 
         was_promoted = False
@@ -50,7 +59,7 @@ class ModelPromoter:
         if win_rate > self.threshold:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             model_path = os.path.join(self.model_dir, f"model_{timestamp}.pt")
-            torch.save(candidate_net.state_dict(), model_path)
+            torch.save(candidate_controller.net.state_dict(), model_path)
            
             print(
                 f"[Promoter]: ✅ Promoted new model with win rate {win_rate:.2%}: {self.best_path} → {model_path}"

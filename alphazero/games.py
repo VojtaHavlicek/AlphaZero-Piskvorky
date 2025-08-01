@@ -23,6 +23,9 @@ DRAW = "D"
 class Gomoku():
     def __init__(self, board_size=5, win_length=4):
         self.board_size = board_size
+        if not isinstance(board_size, int):
+            print(f"[Gomoku] Invalid board size: {board_size}. Must be an integer.")
+            raise ValueError("Board size must be an integer.")
         self.board = [[None for _ in range(board_size)] for _ in range(board_size)]
         self.current_player = X
         self.win_length = win_length
