@@ -4,6 +4,7 @@ from torch import nn, functional
 import torch.nn.functional as functional
 from tqdm import tqdm
 from games import Gomoku  # Assuming Gomoku is defined in games.py
+from constants import LEARNING_RATE  # Assuming LEARNING_RATE is defined in constants.py
 
 
 class AlphaZeroDataset(Dataset):
@@ -85,6 +86,7 @@ class NeuralNetworkController:
 
         with torch.no_grad():
             pred_policy_logits, pred_value = self.net(state_batch)
+            print("[NeuralNetworkController] Predicted policy logits shape:", pred_policy_logits.shape)
             pred_policy = torch.softmax(pred_policy_logits, dim=1)
 
         #with torch.no_grad():
@@ -157,7 +159,7 @@ class NeuralNetworkController:
                 value = value.to(self.device).float()  # Ensure float32 format
 
                 # Perform a training step
-                loss, entropy = self.train_step(state, policy, value, self.optimizer.param_groups[0]['lr'])
+                loss, entropy = self.train_step(state, policy, value, LEARNING_RATE)
                 
                 total_loss += loss
                 total_policy_loss += functional.cross_entropy(
@@ -171,7 +173,7 @@ class NeuralNetworkController:
             total_loss /= len(dataloader)
             total_policy_loss /= len(dataloader)
 
-            print(f"[Controller] Epoch {epoch + 1}/{epochs}. Loss: {total_loss:.4f}, Policy Loss: {total_policy_loss:.4f}")
+            print(f"[Controller] Epoch {epoch + 1}/{epochs}. Loss: {total_loss:.4f}, Policy Loss: {total_policy_loss:.4f}. Entropy: {entropy:.4f}")
             self.training_history.append(
                 {
                     "loss": total_loss,

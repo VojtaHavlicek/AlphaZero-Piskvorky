@@ -6,21 +6,32 @@ Created: 2025-07-11
 Description: Monte Carlo Tree Search (MCTS) implementation for the AlphaZero algorithm.
 License: MIT
 """
+
+# TODO: make sure that the policy is a W x W array, not a flat vector.
 import random
 import numpy as np
 import torch
 import torch.nn
 from games import Gomoku
 from games import X, O, DRAW
+from typing import Callable, Tuple, Mapping
 
 DEFAULT_CACHE_SIZE = 500_000  # Default size for the evaluation cache
 DEFAULT_NUM_SIMULATIONS = 10_000  # Default number of simulations per move
 DEFAULT_EXPLORATION_STRENGTH = 5  # Default exploration strength for UCB
 
 
+# TODO: add caching 
+
 # --- MCTS Node ---
 class Node:
-    def __init__(self, state, parent=None, prior=1.0):
+    """
+    Node in the MCTS tree.
+    """
+    def __init__(self, 
+                 state, 
+                 parent=None, 
+                 prior=1.0):
         self.state = state            # Game state
         self.parent = parent
         self.prior = prior            # Policy prior (P)
@@ -30,10 +41,22 @@ class Node:
         self.Q = 0.0                  # Mean value. Estimated Q-value of the node.
 
     def is_leaf(self):
+        """
+        Check if the node is a leaf node (no children).
+
+        Returns:
+            _type_: _description_
+        """
         return len(self.children) == 0
 
     def expand(self, policy, legal_actions):
-        """Expand node using policy distribution and legal actions."""
+        """
+        Expands node using policy distribution and legal actions.
+
+        Args:
+            policy (np.ndarray): Policy distribution over actions.
+            legal_actions (list[tuple[int, int]]): List of legal actions in the current state.
+        """
         for action in legal_actions:
             if action not in self.children:
                 self.children[action] = Node(
@@ -44,8 +67,11 @@ class Node:
 
     def select(self, c_puct):
         """Select child with max Q + U (PUCT)."""
+
+    
+        # NOTE: max returns the first element, so we need to shuffle the children first
         return max(
-            self.children.items(),
+            self.children.items(), # TODO
             key=lambda item: item[1].Q + c_puct * item[1].prior * np.sqrt(self.N + 1e-8) / (1 + item[1].N)
         )
 
@@ -126,28 +152,29 @@ class MCTS:
         if len(actions) == 0:
             return torch.tensor(pi, dtype=torch.float32), None
         
-        if temperature == 0:
-            best_action = actions[np.argmax(visit_counts)]
-            idx = best_action[0] * root_state.board_size + best_action[1]
-            pi[idx] = 1.0
+        if temperature <= 1e-4:
+            temperature = 1e-4  # Avoid division by zero
+            #best_action = actions[np.argmax(visit_counts)]
+            #idx = best_action[0] * root_state.board_size + best_action[1]
+            #pi[idx] = 1.0
+
+        # Softmax over visit counts (policy improvement)
+        # Apply temperature scaling 
+        log_counts = np.log(visit_counts + 1e-8) / temperature
+        log_counts -= np.max(log_counts)
+        probs = np.exp(log_counts)
+        probs_sum = probs.sum()
+
+        # Numerical errors or zero probabilities -> uniform distribution
+        if probs_sum < 1e-8 or np.isnan(probs_sum):
+            probs = np.ones_like(probs)/len(probs)
         else:
-            # Softmax over visit counts (policy improvement)
-            # Apply temperature scaling 
-            log_counts = np.log(visit_counts + 1e-8) / temperature
-            log_counts -= np.max(log_counts)
-            probs = np.exp(log_counts)
-            probs_sum = probs.sum()
+            probs /= probs_sum
 
-            # Numerical errors or zero probabilities -> uniform distribution
-            if probs_sum < 1e-8 or np.isnan(probs_sum):
-                probs = np.ones_like(probs)/len(probs)
-            else:
-                probs /= probs_sum
+        for (r,c), prob in zip(actions, probs, strict=True):
+            idx = r * root_state.board_size + c
+            pi[idx] = prob
 
-            for (r,c), prob in zip(actions, probs, strict=True):
-                idx = r * root_state.board_size + c
-                pi[idx] = prob
-
-            best_action = actions[np.random.choice(len(actions), p=probs)]
+        best_action = actions[np.random.choice(len(actions), p=probs)]
 
         return pi, best_action

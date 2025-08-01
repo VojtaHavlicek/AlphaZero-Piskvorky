@@ -18,10 +18,10 @@ from games import X, O, DRAW, Gomoku
 from net import GomokuNet  # Assuming GomokuNet is defined in net.py
 
 def default_temperature_schedule(move: int) -> float:
-    if move < 3:
+    if move < 5:
         return 1.0
-    if move < 6:
-        return 0.1
+    if move < 10:
+        return 0.5
     return 0.01
 
 def _worker(task_queue: "mp.Queue", result_queue: "mp.Queue",
@@ -56,7 +56,7 @@ def _worker(task_queue: "mp.Queue", result_queue: "mp.Queue",
                 )
                 if game_state.current_player not in (X, O):
                     raise ValueError(f"Invalid current player: {game_state.current_player}")
-
+                
                 history.append((game_state.encode("cpu"), policy, game_state.current_player))
                 game_state = game_state.apply_action(action)
                 move_num += 1
@@ -92,17 +92,16 @@ class SelfPlayManager:
         """
         Generate rotation-based symmetries of (state, policy).
         state_tensor: shape (1, C, H, W)
-        policy_tensor: shape (H*W,)
+        policy_tensor: shape (W*H array)
         """
-        # TODO: Not implemented yet.
-        H = state_tensor.size(2)
-        W = state_tensor.size(3)
-        policy_grid = policy_tensor.view(H, W)
+
+        print(f"[SelfPlayManager] Policy tensor {policy_tensor} and {state_tensor}")
+
 
         symmetries = []
         for k in range(4):
-            rot_state = torch.rot90(state_tensor, k, [2, 3])
-            rot_policy = torch.rot90(policy_grid, k, [0, 1]).flatten()
+            rot_state = torch.rot90(state_tensor, k, [0, 1])
+            rot_policy = torch.rot90(policy_tensor, k, [0, 1])
             symmetries.append((rot_state.clone(), rot_policy.clone()))
         return symmetries
 
@@ -137,7 +136,16 @@ class SelfPlayManager:
             for _ in range(num_games):
                 try:
                     data = result_queue.get(timeout=60)
-                    results.append(data)
+                    print(f"[SelfPlayManager] Received game with {len(data)} samples.")
+
+                    for state, policy, player in data:
+                        # Augment symmetries
+                        symmetries = self._augment_symmetries(state, policy)
+                        for sym_state, sym_policy in symmetries:
+                            results.append((sym_state, sym_policy, player))
+
+
+                    #results.append(data)
                     pbar.update(1)
                 except Empty:
                     print("[SelfPlayManager] Timeout waiting for result.")

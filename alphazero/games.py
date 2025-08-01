@@ -8,6 +8,7 @@ License: MIT
 """
 import torch
 from typing import List, Tuple
+from constants import BOARD_SIZE, WIN_LENGTH
 
 # NOTE: encodes using relative perspective: 
 # THE CURRENT PLAYER IS ALWAYS IN THE FIRST CHANNEL,
@@ -21,7 +22,9 @@ DRAW = "D"
 
 # --- Gomoku ---
 class Gomoku():
-    def __init__(self, board_size=5, win_length=4):
+    def __init__(self, 
+                 board_size=BOARD_SIZE, 
+                 win_length=WIN_LENGTH):
         self.board_size = board_size
         if not isinstance(board_size, int):
             print(f"[Gomoku] Invalid board size: {board_size}. Must be an integer.")
@@ -128,6 +131,7 @@ class Gomoku():
 
         # MARK: Fourth channel is empty for now, can be used for additional information
         return encoded
+    
 
     # MARK: Get game results 
     def is_terminal(self) -> bool:

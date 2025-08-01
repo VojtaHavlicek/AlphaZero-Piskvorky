@@ -3,9 +3,13 @@ from mcts import MCTS
 from tqdm import tqdm
 from games import O, X, DRAW
 from controller import NeuralNetworkController, make_policy_value_fn
-from train import EVAL_EXPLORATION_CONSTANT, EVALUATION_GAMES, EVAL_TEMPERATURE, NUM_EVAL_SIMULATIONS
+from constants import (
+        EVAL_EXPLORATION_CONSTANT, 
+        EVALUATION_GAMES,
+        EVAL_TEMPERATURE,
+        NUM_EVAL_SIMULATIONS )
 
-
+# NOTE: this is so much faster on CPU than MPS, so we use CPU for evaluation! 
 class ModelEvaluator:
     """
     Evaluates a candidate neural network against a baseline network using MCTS.
@@ -42,15 +46,11 @@ class ModelEvaluator:
 
             mcts_candidate = MCTS(candidate_policy_value_fn, 
                                   num_simulations=NUM_EVAL_SIMULATIONS,
-                                  c_puct=EVAL_EXPLORATION_CONSTANT,
-                                  dirichlet_alpha=0.0, 
-                                  dirichlet_weight=0.0)
+                                  c_puct=EVAL_EXPLORATION_CONSTANT)
             
             mcts_baseline = MCTS(baseline_policy_value_fn,
                                   num_simulations=NUM_EVAL_SIMULATIONS,
-                                  c_puct=EVAL_EXPLORATION_CONSTANT,
-                                  dirichlet_alpha=0.0, 
-                                  dirichlet_weight=0.0)
+                                  c_puct=EVAL_EXPLORATION_CONSTANT)
 
             candidate_symbol, baseline_symbol = X, O
 
@@ -65,7 +65,9 @@ class ModelEvaluator:
                 else:
                     mcts = mcts_baseline
 
-                _, action = mcts.run(game, temperature=0)
+                _, action = mcts.run(game, 
+                                     temperature=EVAL_TEMPERATURE, 
+                                     add_root_noise=False)
 
                 game = game.apply_action(action)
                 

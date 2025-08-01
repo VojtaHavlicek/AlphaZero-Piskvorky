@@ -6,7 +6,6 @@ Created: 2025-07-11
 Description: Training loop for the engine.
 License: MIT
 """
-
 import os
 import torch
 from tqdm import tqdm
@@ -20,65 +19,20 @@ from replay_buffer import ReplayBuffer
 from self_play import SelfPlayManager
 from controller import NeuralNetworkController
 
-# Ultimate TicTacToe implementation:
-# Uses BATCH_SIZE = 2048,
-# KL_DIVERGENCE loss,
-# LR_SCHEDULE = 
-#        bnm_schedule={
-#            95000: 0.02,
-#        },
 
-# https://github.com/arnowaczynski/utttai/blob/main/scripts/train_stage1.py
-
-
-# --- Parameters ---
-BOARD_SIZE = 5
-WIN_LENGTH = 4
-
-# TODO: Set a training schedule 
-# 
-# WARMUP PHASE: 
-# SELF PLAY: 100-200
-# EPOCHS: 3-5
-# BATCH SIZE: 1024
-# EVAL: 20 games
-
-# GROWTH PHASE: 
-#
-#
-#
-#
-#
-#
-
-# REFINEMENT PHASE:
-
-NUM_EPISODES = 100
-NUM_WORKERS = 4  # Adjust based on your CPU cores.
-
-# ---- SELF-PLAY PARAMETERS ----
-NUM_SELF_PLAY_GAMES = 10  # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
-NUM_SELF_PLAY_SIMULATIONS = 150  # Number of MCTS simulations per move.
-SELF_PLAY_EXPLORATION_CONSTANT = 5.0  # Exploration constant for MCTS
-BUFFER_CAPACITY = 10_000
-
-# ---- TRAINING PARAMETERS ----
-BATCH_SIZE = 2048
-BATCHES_PER_EPISODE = 5 # How many batches to train on each episode (roughly same as the buffer capacity)
-NUM_EPOCHS = 3 # How many epochs to train on each batch of data? 
-LEARNING_RATE = 1e-4  # Initial learning rate for the optimizer
-MODEL_DIR = "models"
-
-# ---- EVAL PARAMETERS ----
-EVALUATION_GAMES = 50
-NUM_EVAL_SIMULATIONS = 100  # Number of MCTS simulations for evaluation
-EVAL_EXPLORATION_CONSTANT = 1.0  # Exploration constant for MCTS during evaluation
-EVAL_TEMPERATURE = 0.0  # Temperature for evaluation (lower means more greedy)
-
-
-
-
-
+from constants import (
+    NUM_EPISODES,
+    NUM_WORKERS,
+    NUM_SELF_PLAY_GAMES,
+    NUM_SELF_PLAY_SIMULATIONS,
+    SELF_PLAY_EXPLORATION_CONSTANT,
+    BUFFER_CAPACITY,
+    BATCH_SIZE,
+    BATCHES_PER_EPISODE,
+    NUM_EPOCHS,
+    EVALUATION_GAMES,
+    MODEL_DIR)
+    # Add any other constants you need here
 
 
 if __name__ == "__main__":
@@ -86,14 +40,12 @@ if __name__ == "__main__":
     import torch.multiprocessing as mp
 
     mp.set_start_method("spawn", force=True)
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    device = "cpu" #torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     print(f"[Main] Using {device}")
     
 
     # Initialize network, promoter, and replay buffer
     evaluator = ModelEvaluator(Gomoku,
-                               mcts_params={"num_simulations": NUM_EVAL_SIMULATIONS, 
-                                            "c_puct": EVAL_EXPLORATION_CONSTANT},
         print_games=False,  # Set to True to print game states during evaluation
         device=device
     )

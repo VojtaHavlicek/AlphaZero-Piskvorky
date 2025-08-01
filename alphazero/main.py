@@ -12,6 +12,7 @@ from games import Gomoku, X, O
 from mcts import MCTS
 from net import GomokuNet
 from promoter import ModelPromoter
+from controller import NeuralNetworkController, make_policy_value_fn
 
 GAME_CLASS = Gomoku
 GAME_CLASS_NET = GomokuNet
@@ -38,7 +39,7 @@ def human_vs_ai(model_path=None, model=None):
     else:
         try:
             promoter = ModelPromoter(
-            model_dir="models", evaluator=None, net_class=GomokuNet)
+            model_dir="models", evaluator=None, net_class=GomokuNet, device="cpu")
             net = promoter.get_best_model()
         except FileNotFoundError:
             print(
@@ -47,7 +48,11 @@ def human_vs_ai(model_path=None, model=None):
             return
 
     game = GAME_CLASS()
-    mcts = MCTS(game_class=GAME_CLASS, net=net, exploration_strength=0)
+    mcts = MCTS(policy_value_fn=make_policy_value_fn(
+        NeuralNetworkController(net, device="cpu")),  # Use CPU for inference
+        c_puct=5.0,  # Exploration constant for MCTS
+        num_simulations=150,  # Number of MCTS simulations per move
+    )
 
     print(f"You are playing {GAME_CLASS}")
 

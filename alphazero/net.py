@@ -10,6 +10,7 @@ License: MIT
 import torch
 import torch.nn as nn
 import torch.nn.functional as functional
+from constants import BOARD_SIZE
 
 
 class GomokuNet(nn.Module):
@@ -24,7 +25,7 @@ class GomokuNet(nn.Module):
         nn (_type_): _description_
     """
 
-    def __init__(self, board_size=5, device=None):
+    def __init__(self, board_size=BOARD_SIZE, device=None):
         super().__init__()
         self.device = device if device else torch.device("cpu")
         self.board_size = board_size  # Size of the Gomoku board (e.g., 5 for 5x5 Gomoku)
