@@ -18,15 +18,13 @@ from games import DRAW, Gomoku, O, X
 from mcts import MCTS
 from net import GomokuNet  # Assuming GomokuNet is defined in net.py
 from tqdm import tqdm
+from constants import TEMPERATURE_SCHEDULE_HALFTIME, TEMPERATURE_BASELINE
 
 
 def default_temperature_schedule(move: int) -> float:
-    if move < 3:
-        return 1.0
-    if move < 9:
-        return 0.1
-
-    return 0.01
+    norm = 1 + TEMPERATURE_BASELINE
+    return (np.exp(-move/TEMPERATURE_SCHEDULE_HALFTIME) + TEMPERATURE_BASELINE)/norm  # Exponential decay of temperature
+    
 
 def _worker(task_queue: "mp.Queue", result_queue: "mp.Queue",
             state_dict, mcts_params, temperature_schedule):

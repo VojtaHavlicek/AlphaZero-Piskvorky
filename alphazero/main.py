@@ -8,6 +8,7 @@ License: MIT
 """
 
 import torch
+from model_loader import ModelLoader
 from controller import NeuralNetworkController, make_policy_value_fn
 from games import Gomoku, O, X
 from mcts import MCTS
@@ -38,9 +39,8 @@ def human_vs_ai(model_path=None, model=None):
         net.eval()
     else:
         try:
-            promoter = ModelPromoter(
-            model_dir="models", evaluator=None, net_class=GomokuNet, device="cpu")
-            net = promoter.get_best_model()
+            model_loader = ModelLoader()
+            net = model_loader.get_best_model()
         except FileNotFoundError:
             print(
                 "No model found. Please provide a valid model path or load a pre-trained model."
@@ -50,7 +50,7 @@ def human_vs_ai(model_path=None, model=None):
     game = GAME_CLASS()
     mcts = MCTS(policy_value_fn=make_policy_value_fn(
         NeuralNetworkController(net, device="cpu")),  # Use CPU for inference
-        c_puct=5.0,  # Exploration constant for MCTS
+        c_puct=2.0,  # Exploration constant for MCTS
         num_simulations=150,  # Number of MCTS simulations per move
     )
 

@@ -5,6 +5,7 @@ import torch.nn.functional as functional
 from constants import (  # Assuming LEARNING_RATE is defined in constants.py
     BATCH_SIZE,
     LEARNING_RATE,
+    BOARD_SIZE
 )
 from games import Gomoku  # Assuming Gomoku is defined in games.py
 from torch.utils.data import DataLoader, Dataset
@@ -133,8 +134,8 @@ class NeuralNetworkController:
     def train(self, examples, epochs=10):
         # STATE: (4, 5, 5)
         for example in examples: 
-            if example[0].shape != (4, 5, 5):
-                raise ValueError(f"[Controller] Example state shape {example[0].shape} does not match expected (4, 5, 5). Please check your data preparation.")
+            if example[0].shape != (4, BOARD_SIZE, BOARD_SIZE):
+                raise ValueError(f"[Controller] Example state shape {example[0].shape} does not match expected (4, {BOARD_SIZE}, {BOARD_SIZE}). Please check your data preparation.")
 
         #print(f"[Controller] Train: {examples[0]}, state.shape {examples[0][0].shape}")
         dataloader = self._prepare_data(examples)

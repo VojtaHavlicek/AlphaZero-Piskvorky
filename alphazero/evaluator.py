@@ -1,14 +1,22 @@
 import torch
+import numpy as np
 from constants import (
     EVAL_EXPLORATION_CONSTANT,
     EVAL_TEMPERATURE,
     NUM_EVAL_SIMULATIONS,
+    EVAL_TEMPERATURE_SCHEDULE_HALFTIME,
+    X, O
 )
 from controller import NeuralNetworkController, make_policy_value_fn
-from games import O, X
 from mcts import MCTS
 from tqdm import tqdm
 
+def temperature_schedule(move: int) -> float:
+    """
+    Returns a temperature value based on the move number.
+    This is used to control the exploration-exploitation trade-off during evaluation.
+    """
+    return EVAL_TEMPERATURE*np.exp(-move/EVAL_TEMPERATURE_SCHEDULE_HALFTIME)  # Exponential decay
 
 # NOTE: this is so much faster on CPU than MPS, so we use CPU for evaluation! 
 class ModelEvaluator:
@@ -60,17 +68,26 @@ class ModelEvaluator:
             else:
                 game.current_player = baseline_symbol
 
+            candidate_step = 0 
+            baseline_step = 0
             while not game.is_terminal():
                 if game.current_player == candidate_symbol:
                     mcts = mcts_candidate
+                    step = candidate_step
                 else:
                     mcts = mcts_baseline
+                    step = baseline_step
 
                 _, action = mcts.run(game, 
-                                     temperature=EVAL_TEMPERATURE, 
+                                     temperature=temperature_schedule(step), 
                                      add_root_noise=False)
 
                 game = game.apply_action(action)
+
+                if game.current_player == candidate_symbol:
+                    candidate_step += 1
+                else:
+                    baseline_step += 1
                 
             if debug:
                 print(game)

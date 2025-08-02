@@ -8,15 +8,11 @@ License: MIT
 """
 
 import torch
-from constants import BOARD_SIZE, WIN_LENGTH
+from constants import BOARD_SIZE, WIN_LENGTH, X, O, DRAW
 
 # NOTE: encodes using relative perspective: 
 # THE CURRENT PLAYER IS ALWAYS IN THE FIRST CHANNEL,
 # AND THE OPPONENT IS IN THE SECOND CHANNEL.
-
-X = "X"
-O = "O"
-DRAW = "D"
 
 # TODO: Add an abstract game class later 
 
