@@ -1,5 +1,6 @@
 # AlphaZero - Piskvorky
-This package implements a variant of AlphaZero implementation for training AI models for perfect knowledge games. 
+This package implements a variant of AlphaZero for training AI models for perfect knowledge games. 
+You can use this to train your own [Piskvorky](https://cs.wikipedia.org/wiki/Pi%C5%A1kvorky) playing model from self-play! 
 
 ## Key Features
 - AlphaZero reinforcement learning loop
