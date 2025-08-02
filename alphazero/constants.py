@@ -1,5 +1,5 @@
 # --- Parameters ---
-BOARD_SIZE = 5
+BOARD_SIZE = 6
 WIN_LENGTH = 4
 
 NUM_EPISODES = 10

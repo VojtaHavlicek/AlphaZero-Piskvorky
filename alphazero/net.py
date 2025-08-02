@@ -37,19 +37,20 @@ class GomokuNet(nn.Module):
         self.conv1 = nn.Conv2d(4, 32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
 
         # --- Policy head ---
         # Conv2D -> BatchNorm -> Fully Connected Layer
         # NOTE: First conv layer goes down 128 -> 4 to coordinates.
-        self.policy_conv = nn.Conv2d(128, 4, kernel_size=1)
+        self.policy_conv = nn.Conv2d(256, 4, kernel_size=1)
         self.policy_fc = nn.Linear(
             4 * board_size * board_size, board_size * board_size
         )  # Output size is board_size * board_size (e.g., 5x5 = 25 for Gomoku)
 
         # --- Value head ---
         # Conv2D -> BatchNorm -> Fully Connected Layer -> Fully Connected Layer
-        self.value_conv = nn.Conv2d(128, 2, kernel_size=1)
-        self.value_fc1 = nn.Linear(2 * board_size * board_size, 64)  # Output size is 2 * board_size * board_size
+        self.value_conv = nn.Conv2d(256, 4, kernel_size=1)
+        self.value_fc1 = nn.Linear(4 * board_size * board_size, 64)  # Output size is 2 * board_size * board_size
         self.value_fc2 = nn.Linear(64, 1)
    
     def forward(self, x):
@@ -57,6 +58,7 @@ class GomokuNet(nn.Module):
         out = functional.relu(self.conv1(x))
         out = functional.relu(self.conv2(out))
         out = functional.relu(self.conv3(out))
+        out = functional.relu(self.conv4(out))
 
         # --- Policy head ---
         board_size = self.board_size
