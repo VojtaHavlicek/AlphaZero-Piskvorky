@@ -1,4 +1,4 @@
-# AlphaZero - Gomoku
+# AlphaZero - Piskvorky
 This package implements a variant of AlphaZero implementation for training AI models for perfect knowledge games. 
 
 ## Key Features
