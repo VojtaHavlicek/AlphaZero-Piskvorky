@@ -1,11 +1,9 @@
-# Strategy.ai
-This package implements a suite of reinformcement learning algorithms for board game playing. 
-It contains an AlphaZero implementation that you can use to train AI for games described in games.py. 
-You can then play against the models. 
+# AlphaZero - Gomoku
+This package implements a variant of AlphaZero implementation for training AI models for perfect knowledge games. 
 
 ## Key Features
-- Abstract class for turn based games. 
-- AlphaZero like reinforcement learning loop, including custom neural net definition.
+- AlphaZero reinforcement learning loop
+- Custom neural net definition.
 - Replay Buffer for self-play game data management.
 - Model Promoter for self-play model management 
 
