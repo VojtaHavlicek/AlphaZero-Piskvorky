@@ -110,7 +110,7 @@ class ModelEvaluator:
 
             if debug:
                 print(
-                    f"[Evaluator]: Candidate Win Rate: {win_rate:.2%} (W:{candidate_wins} L:{baseline_wins} D:{draws})"
+                    f"[Evaluator] Candidate Win Rate: {win_rate:.2%} (W:{candidate_wins} L:{baseline_wins} D:{draws})"
                 )
 
         return win_rate, {
