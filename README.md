@@ -2,6 +2,38 @@
 This package implements a variant of AlphaZero for training AI models for perfect knowledge games. 
 You can use this to train your own [Piskvorky](https://cs.wikipedia.org/wiki/Pi%C5%A1kvorky) playing model from self-play! 
 
+## Quick Setup
+### Train 5x5 - 4 in a row
+
+1. Burn in: 
+
+constants.py: 
+```
+BOARD_SIZE = 5, 
+WIN_LENGTH = 4
+NUM_EPISODES = 20
+LEARNING_RATE = 1e-3
+```
+
+python train.py
+
+2. Train: 
+```
+BOARD_SIZE = 5, 
+WIN_LENGTH = 4
+NUM_EPISODES = 100
+LEARNING_RATE = 1e-4
+```
+
+python train.py
+
+3. Playtest
+   python main.py
+
+   If the AI doesn't play well, try to adjust parameters in consts and train a few more batches of episodes (you can increase number of selfplay simulations or play with learning rate). 
+
+
+
 ## Key Features
 - AlphaZero reinforcement learning loop
 - Custom neural net definition.
