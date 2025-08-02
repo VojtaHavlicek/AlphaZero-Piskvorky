@@ -17,6 +17,9 @@ LEARNING_RATE = 1e-3
 
 python train.py
 
+This takes about 30 minutes on my laptop. 
+It populates the example buffer and creates a baseline model.
+
 2. Train: 
 ```
 BOARD_SIZE = 5, 
@@ -26,6 +29,8 @@ LEARNING_RATE = 1e-4
 ```
 
 python train.py
+
+This takes a few hours on my laptop. You should see the AI gradually improving. 
 
 3. Playtest
    python main.py
