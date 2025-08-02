@@ -57,8 +57,8 @@ The training pipeline loops over three things:
 #### Frequently Asked Questions: 
 1. Self play games. 
     * How many games should I play?
-        - For TicTacToe, choose 100-500 per iteration. 
-        - For Gomoku or Othelo, 1_000-10_000.
+        - For Gomoku, 1_000-10_000 new examples per self play.
+        - The engine uses symmetry augmentation, so you need 8x less many games ~  100-150 selfplay games are just fine on 5x5 board. 
     * What data to collect and how to structure things? 
         - The training examples should contain (state, pi, z), where state is the board state encoded as a tensor, pi is an MCTS-based policy (a probability distribution over legal moves at that state) and z is the final game result from the perspective of the player at that state (+1,-1, 0 for draw). Note that all game states contains the final result as a feature. All of the states in the history have to contain the final value. 
         - Replay Buffer can have about 10_000-100_000 samples here. 
