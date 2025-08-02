@@ -6,8 +6,8 @@ Created: 2025-07-11
 Description: Abstract game class and Gomoku implementation for AlphaZero algorithm.
 License: MIT
 """
+
 import torch
-from typing import List, Tuple
 from constants import BOARD_SIZE, WIN_LENGTH
 
 # NOTE: encodes using relative perspective: 
@@ -21,7 +21,7 @@ DRAW = "D"
 # TODO: Add an abstract game class later 
 
 # --- Gomoku ---
-class Gomoku():
+class Gomoku:
     def __init__(self, 
                  board_size=BOARD_SIZE, 
                  win_length=WIN_LENGTH):

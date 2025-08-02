@@ -7,21 +7,25 @@ Description: Self-play implementation for AlphaZero algorithm.
 License: MIT
 """
 
+from collections.abc import Callable
+from queue import Empty
+
+import numpy as np
 import torch
 import torch.multiprocessing as mp
-from tqdm import tqdm
-from queue import Empty
-from collections.abc import Callable
 from controller import NeuralNetworkController, make_policy_value_fn
+from games import DRAW, Gomoku, O, X
 from mcts import MCTS
-from games import X, O, DRAW, Gomoku
 from net import GomokuNet  # Assuming GomokuNet is defined in net.py
+from tqdm import tqdm
+
 
 def default_temperature_schedule(move: int) -> float:
-    if move < 5:
+    if move < 3:
         return 1.0
-    if move < 10:
-        return 0.5
+    if move < 9:
+        return 0.1
+
     return 0.01
 
 def _worker(task_queue: "mp.Queue", result_queue: "mp.Queue",
@@ -54,6 +58,7 @@ def _worker(task_queue: "mp.Queue", result_queue: "mp.Queue",
                     temperature=temp,
                     add_root_noise=True
                 )
+                # print(f"[Worker {task_id}] Policy shape: {policy.shape}")
                 if game_state.current_player not in (X, O):
                     raise ValueError(f"Invalid current player: {game_state.current_player}")
                 
@@ -88,24 +93,23 @@ class SelfPlayManager:
         self.temperature_schedule = temperature_schedule
         self.device = device
 
-    def _augment_symmetries(self, state_tensor, policy_tensor):
+    def _augment_symmetries(self, state_tensor, policy_matrix):
         """
         Generate rotation-based symmetries of (state, policy).
-        state_tensor: shape (1, C, H, W)
-        policy_tensor: shape (W*H array)
+        state_tensor: shape (C, H, W)
+        policy_tensor: shape (W*H numpy array)
         """
-
-        print(f"[SelfPlayManager] Policy tensor {policy_tensor} and {state_tensor}")
 
 
         symmetries = []
         for k in range(4):
-            rot_state = torch.rot90(state_tensor, k, [0, 1])
-            rot_policy = torch.rot90(policy_tensor, k, [0, 1])
-            symmetries.append((rot_state.clone(), rot_policy.clone()))
+            rot_state = torch.rot90(state_tensor, k, [1,2]) # Rotates H, W channels
+            rot_policy = np.rot90(policy_matrix)
+            symmetries.append((rot_state.clone(), 
+                               rot_policy.copy())) # TODO : is this a deepcopy? 
         return symmetries
 
-    def generate_self_play(self, num_games: int, num_workers: int = None, flatten=True) -> list:
+    def generate_self_play(self, num_games: int, num_workers: int = None, flatten=False) -> list:
         if num_workers is None:
             num_workers = min(mp.cpu_count(), num_games)
 
@@ -136,16 +140,15 @@ class SelfPlayManager:
             for _ in range(num_games):
                 try:
                     data = result_queue.get(timeout=60)
-                    print(f"[SelfPlayManager] Received game with {len(data)} samples.")
+                    #print(f"[SelfPlayManager] Received game with {len(data)} samples.")
 
                     for state, policy, player in data:
+                        #print(f"[SelfPlayManager] Policy shape: {policy.shape}")
                         # Augment symmetries
                         symmetries = self._augment_symmetries(state, policy)
                         for sym_state, sym_policy in symmetries:
                             results.append((sym_state, sym_policy, player))
 
-
-                    #results.append(data)
                     pbar.update(1)
                 except Empty:
                     print("[SelfPlayManager] Timeout waiting for result.")
@@ -155,4 +158,4 @@ class SelfPlayManager:
             w.join()
 
         print(f"[SelfPlayManager] Collected {len(results)} games.")
-        return [sample for game in results for sample in game] if flatten else results
+        return results

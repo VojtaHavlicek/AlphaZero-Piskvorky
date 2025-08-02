@@ -1,15 +1,20 @@
+
+import numpy as np
 import torch
-from torch.utils.data import DataLoader, Dataset
-from torch import nn, functional
 import torch.nn.functional as functional
-from tqdm import tqdm
+from constants import (  # Assuming LEARNING_RATE is defined in constants.py
+    BATCH_SIZE,
+    LEARNING_RATE,
+)
 from games import Gomoku  # Assuming Gomoku is defined in games.py
-from constants import LEARNING_RATE  # Assuming LEARNING_RATE is defined in constants.py
+from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
 
 
 class AlphaZeroDataset(Dataset):
     def __init__(self, examples):
         self.examples = examples  # list of (state, policy, value)
+        # print(f"[AlphaZeroDataset] Examples: {examples[0], examples[1], examples[2]}")
 
     def __len__(self):
         return len(self.examples)
@@ -37,10 +42,12 @@ def make_policy_value_fn(controller):
 
         with torch.no_grad():
             policy_logits, value = controller.net(state_tensor)
+            #print(f"[NeuralNetworkController]: Policy logits shape {policy_logits.shape}")
             # Convert to 2D policy map
             board_size = state.board_size
             policy = torch.softmax(policy_logits[0], dim=0).cpu().numpy().reshape(board_size, board_size)
             value = float(value.item())
+            #print(f"[NeuralNetworkController]: Policy shape {policy.shape}")
 
         return policy, value
 
@@ -54,7 +61,7 @@ class NeuralNetworkController:
     def __init__(self, 
                  net, 
                  device,
-                 batch_size=2048):
+                 batch_size=BATCH_SIZE):
         
         print(f"[Controller] Initializing NeuralNetworkController with device: {device}, batch_size: {batch_size}")
        
@@ -69,35 +76,6 @@ class NeuralNetworkController:
         # Use AdamW optimizer with weight decay
         self.optimizer = torch.optim.AdamW(self.net.parameters(), 
                                            weight_decay=self.weight_decay) 
-
-    
-    def policy_value(self, state_batch): 
-        """ 
-        Input:
-            state_batch: A batch of states (numpy array or torch tensor).
-        Output:
-            pred_policy: A numpy array of predicted policies for each state in the batch.
-            pred_value: A numpy array of predicted values for each state in the batch.
-        """
-        if not isinstance(state_batch, torch.Tensor):
-            state_batch = torch.tensor(state_batch, dtype=torch.float32)
-        
-        state_batch = state_batch.to(self.device)
-
-        with torch.no_grad():
-            pred_policy_logits, pred_value = self.net(state_batch)
-            print("[NeuralNetworkController] Predicted policy logits shape:", pred_policy_logits.shape)
-            pred_policy = torch.softmax(pred_policy_logits, dim=1)
-
-        #with torch.no_grad():
-        #           logits, value_tensor = self.net(state.encode(self.device).unsqueeze(0))
-        #            policy = torch.softmax(logits.squeeze(0), dim=0).cpu().numpy().reshape(
-        #                state.board_size, 
-        #                state.board_size
-        #            )
-        #            value = float(value_tensor.item())
-        
-        return pred_policy.cpu().numpy(), pred_value.cpu().numpy()
 
 
     def train_step(self, 
@@ -114,9 +92,17 @@ class NeuralNetworkController:
             winner_batch: A batch of winners (numpy array or torch tensor).
             lr: Learning rate for the optimizer.
         """
+        # TODO: mcts_probs are not normalized! 
+        if not np.isclose(1.0, mcts_probs.sum()): 
+            ValueError(f"[Controller] train_step got unnormalized mcts_probs. mcts_probs.sum() is {mcts_probs.sum()}")
+        else:
+            print(f"[Controller] MCTS Probs sum: {mcts_probs.sum()}")
+
+        print(f"[Controller] MCTS probs {mcts_probs.shape},  dim=0 argmax {mcts_probs.shape}, dim=0 flatten: {mcts_probs.flatten(1,-1)[0]} ")
+
         if not isinstance(state_batch, torch.Tensor):
             state_batch = torch.tensor(state_batch, dtype=torch.float32)
-        
+
         if not isinstance(mcts_probs, torch.Tensor):
             mcts_probs = torch.tensor(mcts_probs, dtype=torch.float32)
         
@@ -131,18 +117,26 @@ class NeuralNetworkController:
         self.optimizer.param_groups[0]['lr'] = lr
 
         pred_policy_logits, pred_value = self.net(state_batch)
-        
         value_loss = functional.mse_loss(pred_value.view(-1), winner_batch)
-        policy_loss = functional.cross_entropy(pred_policy_logits, mcts_probs.argmax(dim=1))
+
+        # NOTE: mcts_probs are flatten 
+        
+        policy_loss = functional.cross_entropy(pred_policy_logits, mcts_probs.flatten(1,-1))
         loss = policy_loss + value_loss
         loss.backward()
         self.optimizer.step()
 
-        entropy = -torch.sum(mcts_probs * torch.log(pred_policy_logits + 1e-8)) / state_batch.size(0)
+        entropy = -torch.sum(mcts_probs.flatten(1,-1) * torch.log(pred_policy_logits + 1e-8)) / state_batch.size(0)
         return loss.item(), entropy.item()
    
 
     def train(self, examples, epochs=10):
+        # STATE: (4, 5, 5)
+        for example in examples: 
+            if example[0].shape != (4, 5, 5):
+                raise ValueError(f"[Controller] Example state shape {example[0].shape} does not match expected (4, 5, 5). Please check your data preparation.")
+
+        #print(f"[Controller] Train: {examples[0]}, state.shape {examples[0][0].shape}")
         dataloader = self._prepare_data(examples)
         self.net.train()
 
@@ -154,17 +148,17 @@ class NeuralNetworkController:
             total_value_loss = 0
 
             for state, policy, value in dataloader:
-                state = state.to(self.device).float()  # Ensure float32 format
-                policy = policy.to(self.device).float()  # Ensure float32 format
-                value = value.to(self.device).float()  # Ensure float32 format
+                
+                #print()
+                print(f"[Controller] state.shape: {state.shape}, policy.shape {policy.shape}")
 
                 # Perform a training step
                 loss, entropy = self.train_step(state, policy, value, LEARNING_RATE)
                 
                 total_loss += loss
                 total_policy_loss += functional.cross_entropy(
-                    self.net(state)[0], policy.argmax(dim=1)
-                ).item()
+                    self.net(state)[0], policy.flatten(1,-1)
+                ).item() 
                 total_value_loss += functional.mse_loss(
                     self.net(state)[1].view(-1), value
                 ).item()
@@ -193,6 +187,7 @@ class NeuralNetworkController:
 
 
     def _prepare_data(self, examples):
+        #print(f"[Controller] Prepare data: {examples[0]}, {examples[1]}")
         dataset = AlphaZeroDataset(examples)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
         return dataloader

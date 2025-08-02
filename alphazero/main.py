@@ -8,11 +8,11 @@ License: MIT
 """
 
 import torch
-from games import Gomoku, X, O
+from controller import NeuralNetworkController, make_policy_value_fn
+from games import Gomoku, O, X
 from mcts import MCTS
 from net import GomokuNet
 from promoter import ModelPromoter
-from controller import NeuralNetworkController, make_policy_value_fn
 
 GAME_CLASS = Gomoku
 GAME_CLASS_NET = GomokuNet

@@ -1,4 +1,3 @@
-import pytest
 
 # Sample constants (match what you use in your game)
 X = "X"

@@ -15,7 +15,7 @@ class ReplayBuffer:
     def __init__(self, capacity):
         self.buffer = deque(maxlen=capacity)
 
-    def add(self, game_examples):
+    def extend(self, game_examples):
         """
         Add a list of game examples to the buffer.
         FIFO behavior is maintained by using a deque with a maximum length.

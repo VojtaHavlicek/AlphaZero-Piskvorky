@@ -1,13 +1,14 @@
 import torch
+from constants import (
+    EVAL_EXPLORATION_CONSTANT,
+    EVAL_TEMPERATURE,
+    NUM_EVAL_SIMULATIONS,
+)
+from controller import NeuralNetworkController, make_policy_value_fn
+from games import O, X
 from mcts import MCTS
 from tqdm import tqdm
-from games import O, X, DRAW
-from controller import NeuralNetworkController, make_policy_value_fn
-from constants import (
-        EVAL_EXPLORATION_CONSTANT, 
-        EVALUATION_GAMES,
-        EVAL_TEMPERATURE,
-        NUM_EVAL_SIMULATIONS )
+
 
 # NOTE: this is so much faster on CPU than MPS, so we use CPU for evaluation! 
 class ModelEvaluator:

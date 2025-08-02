@@ -7,31 +7,32 @@ Description: Training loop for the engine.
 License: MIT
 """
 import os
-import torch
-from tqdm import tqdm
+
+from constants import (
+    BATCH_SIZE,
+    BATCHES_PER_EPISODE,
+    BUFFER_CAPACITY,
+    DEVICE,
+    EVALUATION_GAMES,
+    MODEL_DIR,
+    NUM_EPISODES,
+    NUM_EPOCHS,
+    NUM_SELF_PLAY_GAMES,
+    NUM_SELF_PLAY_SIMULATIONS,
+    NUM_WORKERS,
+    SELF_PLAY_EXPLORATION_CONSTANT,
+)
+from controller import NeuralNetworkController
 from evaluator import ModelEvaluator
 from games import (
     Gomoku,  # NOTE: It may be worth to pakc the recommended ML model into game metadata.
 )
+from model_loader import ModelLoader
 from net import GomokuNet
 from promoter import ModelPromoter
 from replay_buffer import ReplayBuffer
 from self_play import SelfPlayManager
-from controller import NeuralNetworkController
 
-
-from constants import (
-    NUM_EPISODES,
-    NUM_WORKERS,
-    NUM_SELF_PLAY_GAMES,
-    NUM_SELF_PLAY_SIMULATIONS,
-    SELF_PLAY_EXPLORATION_CONSTANT,
-    BUFFER_CAPACITY,
-    BATCH_SIZE,
-    BATCHES_PER_EPISODE,
-    NUM_EPOCHS,
-    EVALUATION_GAMES,
-    MODEL_DIR)
     # Add any other constants you need here
 
 
@@ -40,10 +41,13 @@ if __name__ == "__main__":
     import torch.multiprocessing as mp
 
     mp.set_start_method("spawn", force=True)
-    device = "cpu" #torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    device = DEVICE #torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     print(f"[Main] Using {device}")
     
-
+    
+    model_loader = ModelLoader()  # Initialize the model loader
+    net = model_loader.get_best_model() # Load the best model or initialize a new one if no model exists
+    
     # Initialize network, promoter, and replay buffer
     evaluator = ModelEvaluator(Gomoku,
         print_games=False,  # Set to True to print game states during evaluation
@@ -57,7 +61,7 @@ if __name__ == "__main__":
         device=device
     ) 
 
-    net = promoter.get_best_model() # Load the best model or initialize a new one if no model exists
+   
    
     controller = NeuralNetworkController(
         net=net,
@@ -86,9 +90,9 @@ if __name__ == "__main__":
             num_games=NUM_SELF_PLAY_GAMES,
             num_workers=NUM_WORKERS,  # Adjust number of workers based on your CPU cores
         )
-        print(f"[SelfPlayManager] Generated {len(data)} self-play examples.")
+        print(f"[SelfPlayManager] Generated {len(data)} self-play examples. First entry in data: {data[0]}")
 
-        buffer.add(data)  # Add data to the replay buffer
+        buffer.extend(data)  # Add data to the replay buffer
         print(f"[Buffer]: samples added, current size: {len(buffer)}")
 
         # ---- Train ----
@@ -96,6 +100,7 @@ if __name__ == "__main__":
         for k in range(BATCHES_PER_EPISODE):
             print(f"[Trainer] {k}/{BATCHES_PER_EPISODE} training episode")
             examples = buffer.sample_batch(BATCH_SIZE)
+            #print(f"[Train]: Examples {examples}")
             controller.train(examples, epochs=NUM_EPOCHS)
         print("[Trainer] Training complete.")
        

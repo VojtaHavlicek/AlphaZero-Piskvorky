@@ -9,34 +9,20 @@ License: MIT
 
 import os
 from datetime import datetime
-from controller import NeuralNetworkController
 
 import torch
+from controller import NeuralNetworkController
+from model_loader import ModelLoader
 
 
 class ModelPromoter:
     def __init__(self, model_dir, evaluator, net_class, device, threshold=0.55):
         self.model_dir = model_dir
-        self. evaluator = evaluator
+        self.evaluator = evaluator
         self.net_class = net_class  # To reinstantiate best model
         self.threshold = threshold
         self.device = device
         os.makedirs(model_dir, exist_ok=True)
-        self.best_path = self._find_latest_model()
-
-    def get_best_model(self):
-        if self.best_path is None:
-            print("[Promoter] Choosen a randomly initialized model.")
-            random_net = self.net_class().to(self.device)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            model_path = os.path.join(self.model_dir, f"model_{timestamp}.pt")
-            torch.save(random_net.state_dict(), model_path)
-            return random_net.to(self.device).float()  # Ensure the model is in float32 format
-        
-        print(f"[Promoter] Choosen {self.best_path} for evaluation.")
-        model = self.net_class().to(self.device)
-        model.load_state_dict(torch.load(self.best_path, map_location=self.device))
-        return model.to(self.device).float()  # Ensure the model is in float32 format 
 
     def evaluate_and_maybe_promote(
         self, 
@@ -45,8 +31,10 @@ class ModelPromoter:
         metadata=None, 
         debug=False
     ):
-        baseline_net = self.get_best_model()
-        baseline_controller = NeuralNetworkController(baseline_net, device=self.device)
+        model_loader = ModelLoader()
+        baseline_net = model_loader.get_best_model()
+        baseline_controller = NeuralNetworkController(baseline_net, 
+                                                      device=self.device)
         win_rate, metrics = self.evaluator.evaluate(
             candidate_controller, 
             baseline_controller, 
@@ -62,7 +50,7 @@ class ModelPromoter:
             torch.save(candidate_controller.net.state_dict(), model_path)
            
             print(
-                f"[Promoter]: ✅ Promoted new model with win rate {win_rate:.2%}: {self.best_path} → {model_path}"
+                f"[Promoter]: ✅ Promoted new model with win rate {win_rate:.2%}: {model_path}"
             )
             was_promoted = True
             self.best_path = model_path
@@ -73,11 +61,4 @@ class ModelPromoter:
 
         return win_rate, metrics, was_promoted  # Return both for logging etc.
 
-    def _find_latest_model(self):
-        models = [f for f in os.listdir(self.model_dir) if f.endswith(".pt")]
-        if not models:
-            return None
-        latest = max(
-            models, key=lambda f: os.path.getctime(os.path.join(self.model_dir, f))
-        )
-        return os.path.join(self.model_dir, latest)
+   

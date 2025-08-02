@@ -7,14 +7,12 @@ Description: Monte Carlo Tree Search (MCTS) implementation for the AlphaZero alg
 License: MIT
 """
 
-# TODO: make sure that the policy is a W x W array, not a flat vector.
-import random
+# TODO: make sure that the policy is a W x W
+
 import numpy as np
 import torch
 import torch.nn
-from games import Gomoku
-from games import X, O, DRAW
-from typing import Callable, Tuple, Mapping
+from games import DRAW
 
 DEFAULT_CACHE_SIZE = 500_000  # Default size for the evaluation cache
 DEFAULT_NUM_SIMULATIONS = 10_000  # Default number of simulations per move
@@ -146,17 +144,17 @@ class MCTS:
         visit_counts = np.array([child.N for child in root.children.values()], dtype=np.float32)
         actions = list(root.children.keys())
 
-        # Policy vector
-        pi = np.zeros(root_state.board_size**2, dtype=np.float32)
+        # Policy matrix
+        policy_estimate = np.zeros((root_state.board_size, 
+                       root_state.board_size), dtype=np.float32)
 
+        # If there is no valid action, return empty policy and None action
         if len(actions) == 0:
-            return torch.tensor(pi, dtype=torch.float32), None
+            return torch.tensor(policy_estimate, dtype=torch.float32), None
         
-        if temperature <= 1e-4:
-            temperature = 1e-4  # Avoid division by zero
-            #best_action = actions[np.argmax(visit_counts)]
-            #idx = best_action[0] * root_state.board_size + best_action[1]
-            #pi[idx] = 1.0
+        # Avoid division by zero by clipping 
+        if temperature <= 1e-7:
+            temperature = 1e-7  
 
         # Softmax over visit counts (policy improvement)
         # Apply temperature scaling 
@@ -171,10 +169,15 @@ class MCTS:
         else:
             probs /= probs_sum
 
-        for (r,c), prob in zip(actions, probs, strict=True):
-            idx = r * root_state.board_size + c
-            pi[idx] = prob
+        # Populate the policy vector
+        for (row,col), prob in zip(actions, probs, strict=True):
+            policy_estimate[row, col] = prob
 
+        # Choose the action relatively to probs
         best_action = actions[np.random.choice(len(actions), p=probs)]
 
-        return pi, best_action
+        # Pi has shape board_size x board_size
+        if not np.isclose(policy_estimate.sum(), 1.0): 
+            ValueError("[MCTS] Error: policy is not normalized!")
+
+        return policy_estimate, best_action
