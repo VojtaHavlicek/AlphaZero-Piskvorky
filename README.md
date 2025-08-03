@@ -66,15 +66,13 @@ The training pipeline loops over three things:
 
 2. Train neural net on the newly collected data, batch subsampled from the buffer
     * What batch size to choose and how many epochs? 
-        - 64-128 for small boards like TicTacToe
-        - 256+ on larger boards, GPU permitting. 
+        - 1024-2048 worked best. 
     * What neural network architecture to choose? 
-        - board state is a 3x3xC tensor (C channels for current player, opponent, turn marker). (Understand better).
-        - 2-3 convolutional layers (32 filters, 3x3 kernels, ReLU).
-        - Flatten -> Fully connected layers.
+        - Few convolutional layers in the stem, conv layers in the heads.
+        - This will change - will add ResidualBlocks.
 
         - Two heads: 
-            - Policy head: dense -> softmax over actions (9 for 3x3)
+            - Policy head: dense 
             - Value head: dense -> scalar output (tanh activation for z in [-1,1])
 
 
