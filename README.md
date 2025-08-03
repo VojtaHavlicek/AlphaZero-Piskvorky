@@ -2,6 +2,8 @@
 An implementation of AlphaZero for training AI for perfect knowledge games. 
 Use this to train your own [Piskvorky](https://cs.wikipedia.org/wiki/Pi%C5%A1kvorky) model from self-play! 
 
+*Note: this repo is under active development* 
+
 ## Quick Setup
 ### Train 5x5 - 4 in a row
 
