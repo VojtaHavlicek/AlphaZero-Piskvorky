@@ -79,9 +79,9 @@ The training pipeline loops over three things:
 
 3. Evaluate the neural net and promote the model if it did better. 
     * How many self play games to choose for evaluation? 
-        - Use at least 50-100 games to compare the new model to the current.
-        - If the new model wins more than 55-60%, promote it as the new best. 
-        - This can be adaptive (using Elo ratings or statistical significance testing)
+        - Use at least 50 games to compare the new model to the current. The code uses symmetry augmentation by ~8x factor. 
+        - If the new model wins more than 55%, promote it as the new best. 
+        - This can be adaptive (TODO: using Elo ratings or statistical significance testing)
 
 4. Value and Policy head
     * AlphaZero's neural net predicts two things for any given position:
@@ -99,17 +99,12 @@ The training pipeline loops over three things:
             - In classical MCTS before Zero, needed rollouts. Not here! 
             - Stop early and use the value estimate. 
 
-        - Learns from **game outcomes** 
-
-    
-
 
 5. Miscelaneous notes:  
     * MCTS
         - Use temperature annealing for exploration early in training, low for precise eval later in the optimization 
         - Dirichlet noise: add to the root node during self-play to encourage exploration 
-        - Very important: resolve policy search ties at random! 
-
+      
     - Data augmentation: Augment data using rotation/reflections.
 
 
