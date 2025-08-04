@@ -7,16 +7,14 @@ Description: Monte Carlo Tree Search (MCTS) implementation for the AlphaZero alg
 License: MIT
 """
 
-# TODO: make sure that the policy is a W x W
-
 import numpy as np
 import torch
 import torch.nn
 from games import DRAW
 
 DEFAULT_CACHE_SIZE = 500_000  # Default size for the evaluation cache
-DEFAULT_NUM_SIMULATIONS = 10_000  # Default number of simulations per move
-DEFAULT_EXPLORATION_STRENGTH = 5  # Default exploration strength for UCB
+DEFAULT_NUM_SIMULATIONS = 1_000  # Default number of simulations per move
+DEFAULT_EXPLORATION_STRENGTH = 2 # Default exploration strength for UCB
 
 
 # TODO: add caching 

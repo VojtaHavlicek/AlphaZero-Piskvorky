@@ -2,7 +2,7 @@
 BOARD_SIZE = 7
 WIN_LENGTH = 5
 
-NUM_EPISODES = 50
+NUM_EPISODES = 10
 NUM_WORKERS = 6 # Adjust based on your CPU cores.
 
 DEVICE = "cpu"
@@ -14,7 +14,7 @@ DRAW = "D"
 
 # ---- SELF-PLAY PARAMETERS ----
 NUM_SELF_PLAY_GAMES = 200 # 100-500 for TicTacToe, 1_000-10_000 for Gomoku
-NUM_SELF_PLAY_SIMULATIONS = 200  # Number of MCTS simulations per move.
+NUM_SELF_PLAY_SIMULATIONS = 250  # Number of MCTS simulations per move.
 SELF_PLAY_EXPLORATION_CONSTANT = 3.0  # Exploration constant for MCTS
 BUFFER_CAPACITY = 40_000 
 TEMPERATURE_SCHEDULE_HALFTIME = 100
